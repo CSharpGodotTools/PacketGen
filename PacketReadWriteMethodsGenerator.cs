@@ -5,9 +5,9 @@ using System.Linq;
 
 namespace PacketGen;
 
-internal class PacketSourceGenerator
+internal class PacketReadWriteMethodsGenerator
 {
-    public static void Generate(SourceProductionContext context, INamedTypeSymbol symbol)
+    public static string? GetSource(SourceProductionContext context, INamedTypeSymbol symbol)
     {
         List<IPropertySymbol> properties = [];
         bool hasWriteReadMethods = false;
@@ -34,7 +34,7 @@ internal class PacketSourceGenerator
         }
 
         if (hasWriteReadMethods || properties.Count == 0)
-            return;
+            return null;
 
         var namespaceName = symbol.ContainingNamespace.ToDisplayString();
         var className = symbol.Name;
@@ -73,6 +73,6 @@ public partial class {{className}}
 
 """;
 
-        context.AddSource($"{symbol.Name}.g.cs", sourceCode);
+        return sourceCode;
     }
 }

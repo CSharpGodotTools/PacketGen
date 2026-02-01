@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 
@@ -26,6 +27,9 @@ internal class Program : IIncrementalGenerator
     {
         var (compilation, list) = tuple;
 
+        var clientSymbols = new List<INamedTypeSymbol>();
+        var serverSymbols = new List<INamedTypeSymbol>();
+
         foreach (var syntax in list)
         {
             if (compilation
@@ -36,10 +40,30 @@ internal class Program : IIncrementalGenerator
             if (symbol.BaseType == null)
                 continue;
 
-            if (symbol.BaseType.Name != "ServerPacket" && symbol.BaseType.Name != "ClientPacket")
-                continue;
+            if (symbol.BaseType.Name == "ClientPacket")
+            {
+                clientSymbols.Add(symbol);
 
-            PacketSourceGenerator.Generate(context, symbol);
+                string? sourceCode = PacketReadWriteMethodsGenerator.GetSource(context, symbol);
+
+                if (sourceCode != null)
+                    // For example: CPacketPlayerInfo.g.cs
+                    context.AddSource($"{symbol.Name}.g.cs", sourceCode);
+            }
+
+            if (symbol.BaseType.Name == "ServerPacket")
+            {
+                serverSymbols.Add(symbol);
+
+                string? sourceCode = PacketReadWriteMethodsGenerator.GetSource(context, symbol);
+
+                if (sourceCode != null)
+                    // For example: SPacketPlayerPositions.g.cs
+                    context.AddSource($"{symbol.Name}.g.cs", sourceCode);
+            }
         }
+
+        var source = PacketRegistryGenerator.GetSource(clientSymbols, serverSymbols);
+        context.AddSource("PacketRegistry.g.cs", source);
     }
 }
