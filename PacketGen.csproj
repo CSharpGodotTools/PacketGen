@@ -33,4 +33,11 @@
         <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" />
     </ItemGroup>
 
+    <!-- Post Build Copy Local NuGet -->
+    <Target Name="CopyLocalNuget" AfterTargets="Pack">
+        <Copy
+          SourceFiles="$(OutputPath)..\$(PackageId).$(PackageVersion).nupkg"
+          DestinationFiles="C:\Users\Valk\Documents\_Godot Projects\Template\Framework\Libraries\$(PackageId).$(PackageVersion).nupkg"
+          SkipUnchangedFiles="false" />
+    </Target>
 </Project>
