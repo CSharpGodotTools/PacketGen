@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 
 namespace PacketGen;
 
@@ -27,15 +28,11 @@ public class PacketSourceGenerator : IIncrementalGenerator
     {
         var (compilation, list) = tuple;
 
-        var nameList = new List<string>();
-
         foreach (var syntax in list)
         {
-            var symbol = compilation
+            if (compilation
                 .GetSemanticModel(syntax.SyntaxTree)
-                .GetDeclaredSymbol(syntax) as INamedTypeSymbol;
-
-            if (symbol == null)
+                .GetDeclaredSymbol(syntax) is not INamedTypeSymbol symbol)
                 continue;
 
             if (symbol.BaseType == null)
@@ -43,23 +40,95 @@ public class PacketSourceGenerator : IIncrementalGenerator
 
             if (symbol.BaseType.Name == "ServerPacket" || symbol.BaseType.Name == "ClientPacket")
             {
-                nameList.Add($"\"{symbol.ToDisplayString()}\"");
+                List<IPropertySymbol> properties = [];
+
+                foreach (var member in symbol.GetMembers())
+                {
+                    if (member is IPropertySymbol property)
+                    {
+                        properties.Add(property);
+                    }
+                }
+
+                if (properties.Count > 0)
+                {
+                    string sourceCode = GenerateSourceStr(symbol, properties);
+
+                    context.AddSource($"{symbol.Name}.g.cs", sourceCode);
+                }
             }
+        }
+    }
+
+    private string GenerateSourceStr(INamedTypeSymbol symbol, List<IPropertySymbol> properties)
+    {
+        var namespaceName = symbol.ContainingNamespace.ToDisplayString();
+        var className = symbol.Name;
+
+        var writeLines = new List<string>();
+        var readLines = new List<string>();
+
+        foreach (IPropertySymbol property in properties)
+        {
+            writeLines.Add($"writer.Write({property.Name});");
+        }
+
+        foreach (IPropertySymbol property in properties)
+        {
+            string? readMethodSuffix = property.Type.SpecialType switch
+            {
+                SpecialType.System_Byte => "Byte",
+                SpecialType.System_SByte => "SByte",
+                SpecialType.System_Char => "Char",
+                SpecialType.System_String => "String",
+                SpecialType.System_Boolean => "Bool",
+                SpecialType.System_Int16 => "Short",
+                SpecialType.System_UInt16 => "UShort",
+                SpecialType.System_Int32 => "Int",
+                SpecialType.System_UInt32 => "UInt",
+                SpecialType.System_Single => "Float",
+                SpecialType.System_Double => "Double",
+                SpecialType.System_Int64 => "Long",
+                SpecialType.System_UInt64 => "ULong",
+                _ => null
+            };
+
+            if (readMethodSuffix == null)
+            {
+                var typeName = property.Type.ToDisplayString();
+
+                readMethodSuffix = typeName switch
+                {
+                    "byte[]" => "Bytes",
+                    "Godot.Vector2" => "Vector2",
+                    "Godot.Vector3" => "Vector3",
+                    _ => throw new NotSupportedException($"Type {property.Type} not supported")
+                };
+            }
+
+            readLines.Add($"{property.Name} = reader.Read{readMethodSuffix}();");
         }
 
         var sourceCode = $$"""
 using Godot;
 
-namespace GeneratedCode;
+namespace {{namespaceName}};
 
-public class HelloWorld
+public partial class {{className}}
 {
-    /*
-    {{string.Join("\n    ", nameList)}}
-    */
+    public override void Write(PacketWriter writer)
+    {
+{{string.Join("\n", writeLines.Select(line => "        " + line))}}
+    }
+
+    public override void Read(PacketReader reader)
+    {
+{{string.Join("\n", readLines.Select(line => "        " + line))}}
+    }
 }
+
 """;
 
-        context.AddSource("HelloWorld.g.cs", sourceCode);
+        return sourceCode;
     }
 }
