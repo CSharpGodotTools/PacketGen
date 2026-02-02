@@ -86,8 +86,7 @@ public partial class {{className}}
         string indent,
         int depth = 0)
     {
-        string? suffix = ReadMethodSuffix.Get(type.SpecialType) 
-            ?? ReadMethodSuffix.Get(type);
+        string? suffix = ReadMethodSuffix.Get(type);
 
         // Primitive
         if (suffix != null)
@@ -120,8 +119,7 @@ public partial class {{className}}
             writeLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
             writeLines.Add($"{indent}{{");
 
-            string? elementSuffix = ReadMethodSuffix.Get(elementType.SpecialType) 
-                ?? ReadMethodSuffix.Get(elementType);
+            string? elementSuffix = ReadMethodSuffix.Get(elementType);
 
             if (elementSuffix != null)
             {
@@ -205,7 +203,7 @@ public partial class {{className}}
     {
         rootName ??= targetExpression;
 
-        string? suffix = ReadMethodSuffix.Get(type.SpecialType) ?? ReadMethodSuffix.Get(type);
+        string? suffix = ReadMethodSuffix.Get(type);
 
         // Primitive
         if (suffix != null)
@@ -251,8 +249,7 @@ public partial class {{className}}
             readLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
             readLines.Add($"{indent}{{");
 
-            string? elementSuffix = ReadMethodSuffix.Get(elementType.SpecialType)
-                ?? ReadMethodSuffix.Get(elementType);
+            string? elementSuffix = ReadMethodSuffix.Get(elementType);
 
             if (elementSuffix != null)
             {
