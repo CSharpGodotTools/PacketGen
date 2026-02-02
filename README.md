@@ -1,6 +1,238 @@
 # PacketGen
 Source generator for the netcode packet scripts in https://github.com/CSharpGodotTools/Template
 
+## What gets Generated
+Example 1:
+```cs
+public partial class CPacketPlayerInfo : ClientPacket
+{
+    public string Username { get; set; }
+    public Vector2 Position { get; set; }
+}
+```
+
+Source gen outputs:
+```cs
+public partial class CPacketPlayerInfo
+{
+    public override void Write(PacketWriter writer)
+    {
+        writer.Write(Username);
+        writer.Write(Position);
+    }
+
+    public override void Read(PacketReader reader)
+    {
+        Username = reader.ReadString();
+        Position = reader.ReadVector2();
+    }
+}
+
+```
+
+Example 2:
+```cs
+public partial class CPacketTest : ClientPacket
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; }
+
+    public List<int> Numbers { get; set; }
+
+    public List<List<int>> Matrix { get; set; }
+
+    public Dictionary<string, int> Scores { get; set; }
+
+    public Dictionary<string, List<int>> Test { get; set; }
+
+    public Dictionary<string, List<List<int>>> Deep { get; set; }
+}
+```
+
+Source gen outputs:
+```cs
+public partial class CPacketTest
+{
+    public override void Write(PacketWriter writer)
+    {
+        writer.Write(Id);
+        writer.Write(Name);
+        #region Numbers
+        writer.Write(Numbers.Count);
+        
+        for (int i0 = 0; i0 < Numbers.Count; i0++)
+        {
+            writer.Write(Numbers[i0]);
+        }
+        #endregion
+        #region Matrix
+        writer.Write(Matrix.Count);
+        
+        for (int i0 = 0; i0 < Matrix.Count; i0++)
+        {
+            writer.Write(Matrix[i0].Count);
+        
+            for (int i1 = 0; i1 < Matrix[i0].Count; i1++)
+            {
+                writer.Write(Matrix[i0][i1]);
+            }
+        }
+        #endregion
+        #region Scores
+        // Scores
+        writer.Write(Scores.Count);
+        
+        foreach (var kv0 in Scores)
+        {
+            writer.Write(kv0.Key);
+        
+            writer.Write(kv0.Value);
+        }
+        #endregion
+        #region Test
+        // Test
+        writer.Write(Test.Count);
+        
+        foreach (var kv0 in Test)
+        {
+            writer.Write(kv0.Key);
+        
+            writer.Write(kv0.Value.Count);
+        
+            for (int i1 = 0; i1 < kv0.Value.Count; i1++)
+            {
+                writer.Write(kv0.Value[i1]);
+            }
+        }
+        #endregion
+        #region Deep
+        // Deep
+        writer.Write(Deep.Count);
+        
+        foreach (var kv0 in Deep)
+        {
+            writer.Write(kv0.Key);
+        
+            writer.Write(kv0.Value.Count);
+        
+            for (int i1 = 0; i1 < kv0.Value.Count; i1++)
+            {
+                writer.Write(kv0.Value[i1].Count);
+        
+                for (int i2 = 0; i2 < kv0.Value[i1].Count; i2++)
+                {
+                    writer.Write(kv0.Value[i1][i2]);
+                }
+            }
+        }
+        #endregion
+    }
+
+    public override void Read(PacketReader reader)
+    {
+        Id = reader.ReadInt();
+        Name = reader.ReadString();
+        #region Numbers
+        Numbers = new List<int>();
+        int numbersCount = reader.ReadInt();
+        
+        for (int i0 = 0; i0 < numbersCount; i0++)
+        {
+            Numbers.Add(reader.ReadInt());
+        }
+        #endregion
+        #region Matrix
+        Matrix = new List<List<int>>();
+        int matrixCount = reader.ReadInt();
+        
+        for (int i0 = 0; i0 < matrixCount; i0++)
+        {
+            List<int> element0 = new List<int>();
+            element0 = new List<int>();
+            int count1 = reader.ReadInt();
+        
+            for (int i1 = 0; i1 < count1; i1++)
+            {
+                element0.Add(reader.ReadInt());
+            }
+        
+            Matrix.Add(element0);
+        }
+        #endregion
+        #region Scores
+        Scores = new Dictionary<string, int>();
+        int scoresCount = reader.ReadInt();
+        
+        for (int i0 = 0; i0 < scoresCount; i0++)
+        {
+            string key0;
+            int value0;
+        
+            key0 = reader.ReadString();
+        
+            value0 = reader.ReadInt();
+        
+            Scores.Add(key0, value0);
+        }
+        #endregion
+        #region Test
+        Test = new Dictionary<string, List<int>>();
+        int testCount = reader.ReadInt();
+        
+        for (int i0 = 0; i0 < testCount; i0++)
+        {
+            string key0;
+            List<int> value0;
+        
+            key0 = reader.ReadString();
+        
+            value0 = new List<int>();
+            int count1 = reader.ReadInt();
+        
+            for (int i1 = 0; i1 < count1; i1++)
+            {
+                value0.Add(reader.ReadInt());
+            }
+        
+            Test.Add(key0, value0);
+        }
+        #endregion
+        #region Deep
+        Deep = new Dictionary<string, List<List<int>>>();
+        int deepCount = reader.ReadInt();
+        
+        for (int i0 = 0; i0 < deepCount; i0++)
+        {
+            string key0;
+            List<List<int>> value0;
+        
+            key0 = reader.ReadString();
+        
+            value0 = new List<List<int>>();
+            int count1 = reader.ReadInt();
+        
+            for (int i1 = 0; i1 < count1; i1++)
+            {
+                List<int> element1 = new List<int>();
+                element1 = new List<int>();
+                int count2 = reader.ReadInt();
+        
+                for (int i2 = 0; i2 < count2; i2++)
+                {
+                    element1.Add(reader.ReadInt());
+                }
+        
+                value0.Add(element1);
+            }
+        
+            Deep.Add(key0, value0);
+        }
+        #endregion
+    }
+}
+```
+
 ## Installing as Dll
 This is the simplest way to install but requires manually copying after each build.
 
