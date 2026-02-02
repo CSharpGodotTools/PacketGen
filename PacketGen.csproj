@@ -11,7 +11,8 @@
 
     <!-- Package Settings -->
     <PropertyGroup>
-        <Version>1.0.5</Version>
+        <!--<Version>1.0.12</Version>-->
+        <Version>1.0.$([System.Math]::Floor($([MSBuild]::Divide($([System.DateTimeOffset]::UtcNow.ToUnixTimeSeconds()), 86400)))).$([MSBuild]::Divide($([MSBuild]::Modulo($([System.DateTimeOffset]::UtcNow.ToUnixTimeSeconds()), 86400)), 2))</Version>
         <Description>Source generators for CSharpGodotTools/Template</Description>
         <Authors>Valkyrienyanko</Authors>
         <PackageTags>Godot C# SourceGenerator</PackageTags>
