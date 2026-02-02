@@ -38,10 +38,6 @@ public partial class CPacketTest : ClientPacket
 
     public string Name { get; set; }
 
-    public List<int> Numbers { get; set; }
-
-    public List<List<int>> Matrix { get; set; }
-
     public Dictionary<string, int> Scores { get; set; }
 
     public Dictionary<string, List<int>> Test { get; set; }
@@ -58,27 +54,6 @@ public partial class CPacketTest
     {
         writer.Write(Id);
         writer.Write(Name);
-        #region Numbers
-        writer.Write(Numbers.Count);
-        
-        for (int i0 = 0; i0 < Numbers.Count; i0++)
-        {
-            writer.Write(Numbers[i0]);
-        }
-        #endregion
-        #region Matrix
-        writer.Write(Matrix.Count);
-        
-        for (int i0 = 0; i0 < Matrix.Count; i0++)
-        {
-            writer.Write(Matrix[i0].Count);
-        
-            for (int i1 = 0; i1 < Matrix[i0].Count; i1++)
-            {
-                writer.Write(Matrix[i0][i1]);
-            }
-        }
-        #endregion
         #region Scores
         // Scores
         writer.Write(Scores.Count);
@@ -133,33 +108,6 @@ public partial class CPacketTest
     {
         Id = reader.ReadInt();
         Name = reader.ReadString();
-        #region Numbers
-        Numbers = new List<int>();
-        int numbersCount = reader.ReadInt();
-        
-        for (int i0 = 0; i0 < numbersCount; i0++)
-        {
-            Numbers.Add(reader.ReadInt());
-        }
-        #endregion
-        #region Matrix
-        Matrix = new List<List<int>>();
-        int matrixCount = reader.ReadInt();
-        
-        for (int i0 = 0; i0 < matrixCount; i0++)
-        {
-            List<int> element0 = new List<int>();
-            element0 = new List<int>();
-            int count1 = reader.ReadInt();
-        
-            for (int i1 = 0; i1 < count1; i1++)
-            {
-                element0.Add(reader.ReadInt());
-            }
-        
-            Matrix.Add(element0);
-        }
-        #endregion
         #region Scores
         Scores = new Dictionary<string, int>();
         int scoresCount = reader.ReadInt();
