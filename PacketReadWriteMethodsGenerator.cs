@@ -86,8 +86,7 @@ public partial class {{className}}
         string indent,
         int depth = 0)
     {
-        string? suffix =
-            ReadMethodSuffix.Get(type.SpecialType)
+        string? suffix = ReadMethodSuffix.Get(type.SpecialType) 
             ?? ReadMethodSuffix.Get(type);
 
         // Primitive
@@ -121,8 +120,7 @@ public partial class {{className}}
             writeLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
             writeLines.Add($"{indent}{{");
 
-            string? elementSuffix =
-                ReadMethodSuffix.Get(elementType.SpecialType)
+            string? elementSuffix = ReadMethodSuffix.Get(elementType.SpecialType) 
                 ?? ReadMethodSuffix.Get(elementType);
 
             if (elementSuffix != null)
@@ -154,7 +152,6 @@ public partial class {{className}}
             ITypeSymbol keyType = namedType.TypeArguments[0];
             ITypeSymbol valueType = namedType.TypeArguments[1];
 
-            string loopIndex = $"i{depth}";
             string kvVar = $"kv{depth}";
 
             if (depth == 0)
@@ -208,9 +205,7 @@ public partial class {{className}}
     {
         rootName ??= targetExpression;
 
-        string? suffix =
-            ReadMethodSuffix.Get(type.SpecialType)
-            ?? ReadMethodSuffix.Get(type);
+        string? suffix = ReadMethodSuffix.Get(type.SpecialType) ?? ReadMethodSuffix.Get(type);
 
         // Primitive
         if (suffix != null)
@@ -231,11 +226,11 @@ public partial class {{className}}
             namespaces.Add("System.Collections.Generic");
 
             ITypeSymbol elementType = namedType.TypeArguments[0];
-            string elementTypeName =
-                elementType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
 
-            string countVar =
-                depth == 0
+            // MinimallyQualifiedFormat outputs List<int> instead of System.Collections.Generic.List<int>
+            string elementTypeName = elementType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+
+            string countVar = depth == 0
                     ? $"{char.ToLowerInvariant(rootName[0])}{rootName.Substring(1)}Count"
                     : $"count{depth}";
 
@@ -245,23 +240,28 @@ public partial class {{className}}
             if (depth == 0)
                 readLines.Add($"{indent}#region {targetExpression}");
 
+            // Create the list
             readLines.Add($"{indent}{targetExpression} = new List<{elementTypeName}>();");
+
+            // Keep track of the list count
             readLines.Add($"{indent}int {countVar} = reader.ReadInt();");
             readLines.Add("");
 
+            // Loop
             readLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
             readLines.Add($"{indent}{{");
 
-            string? elementSuffix =
-                ReadMethodSuffix.Get(elementType.SpecialType)
+            string? elementSuffix = ReadMethodSuffix.Get(elementType.SpecialType)
                 ?? ReadMethodSuffix.Get(elementType);
 
             if (elementSuffix != null)
             {
+                // Primitive type
                 readLines.Add($"{indent}    {targetExpression}.Add(reader.Read{elementSuffix}());");
             }
             else
             {
+                // Generic type
                 readLines.Add($"{indent}    {elementTypeName} {elementVar} = new {elementTypeName}();");
 
                 GenerateRead(
@@ -294,16 +294,15 @@ public partial class {{className}}
             ITypeSymbol keyType = namedType.TypeArguments[0];
             ITypeSymbol valueType = namedType.TypeArguments[1];
 
-            string keyTypeName =
-                keyType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
-            string valueTypeName =
-                valueType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+            // MinimallyQualifiedFormat outputs List<int> instead of System.Collections.Generic.List<int>
+            string keyTypeName = keyType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+            string valueTypeName = valueType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
 
-            string countVar =
-                depth == 0
+            string countVar = depth == 0
                     ? $"{char.ToLowerInvariant(rootName[0])}{rootName.Substring(1)}Count"
                     : $"count{depth}";
 
+            // Prevent duplicate variable names by using depth as suffix
             string loopIndex = $"i{depth}";
             string keyVar = $"key{depth}";
             string valueVar = $"value{depth}";
@@ -311,17 +310,21 @@ public partial class {{className}}
             if (depth == 0)
                 readLines.Add($"{indent}#region {targetExpression}");
 
+            // Create the dictionary
             readLines.Add($"{indent}{targetExpression} = new Dictionary<{keyTypeName}, {valueTypeName}>();");
+
+            // Keep track of the dictionary count (assume int is preferred)
             readLines.Add($"{indent}int {countVar} = reader.ReadInt();");
             readLines.Add("");
 
+            // Loop
             readLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
             readLines.Add($"{indent}{{");
-
-            readLines.Add($"{indent}    {keyTypeName} {keyVar};");
-            readLines.Add($"{indent}    {valueTypeName} {valueVar};");
+            readLines.Add($"{indent}    {keyTypeName} {keyVar};"); // e.g. string key0;
+            readLines.Add($"{indent}    {valueTypeName} {valueVar};"); // e.g. int value0;
             readLines.Add("");
 
+            // Read key0
             GenerateRead(
                 context,
                 keyType,
@@ -334,6 +337,7 @@ public partial class {{className}}
 
             readLines.Add("");
 
+            // Read value0
             GenerateRead(
                 context,
                 valueType,
@@ -345,6 +349,7 @@ public partial class {{className}}
                 rootName);
 
             readLines.Add("");
+            // Add the key0 and value0 to the dictionary
             readLines.Add($"{indent}    {targetExpression}.Add({keyVar}, {valueVar});");
             readLines.Add($"{indent}}}");
 
