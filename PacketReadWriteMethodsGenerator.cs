@@ -1,4 +1,4 @@
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using PacketGen.Utilities;
 using System.Collections.Generic;
 using System.Linq;
@@ -45,67 +45,23 @@ internal class PacketReadWriteMethodsGenerator
 
         foreach (IPropertySymbol property in properties)
         {
-            string propName = property.Name;
-
-            // List<int>
-            if (property.Type is INamedTypeSymbol namedTypeSymbol && namedTypeSymbol.IsGenericType)
-            {
-                ITypeSymbol typeArg = namedTypeSymbol.TypeArguments[0];
-                string genericTypeArg = typeArg.ToDisplayString(); // int
-
-                writeLines.Add($"// {propName}");
-                writeLines.Add($"writer.Write({propName}.Count);");
-                writeLines.Add($"");
-                writeLines.Add($"for (int i = 0; i < {propName}.Count; i++)");
-                writeLines.Add($"{{");
-                writeLines.Add($"    writer.Write<{genericTypeArg}>({propName}[i]);");
-                writeLines.Add($"}}");
-            }
-            else
-            {
-                writeLines.Add($"writer.Write({propName});");
-            }
+            GenerateWrite(
+                context,
+                property.Type,
+                property.Name,
+                writeLines,
+                "");
         }
 
         foreach (IPropertySymbol property in properties)
         {
-            string? suffix = ReadMethodSuffix.Get(property.Type.SpecialType);
-            suffix ??= ReadMethodSuffix.Get(property.Type);
-
-            string propName = property.Name;
-
-            if (suffix == null)
-            {
-                // List<int>
-                if (property.Type is INamedTypeSymbol namedTypeSymbol && namedTypeSymbol.IsGenericType)
-                {
-                    ITypeSymbol typeArg = namedTypeSymbol.TypeArguments[0];
-                    string genericTypeArg = typeArg.ToDisplayString(); // int
-                    string genericNamespace = namedTypeSymbol.ContainingNamespace.ToDisplayString(); // System.Collections.Generic
-                    string? readMethodSuffix = ReadMethodSuffix.Get(typeArg.SpecialType); // Int
-                    readMethodSuffix ??= ReadMethodSuffix.Get(typeArg); // byte[]
-
-                    namespaces.Add(genericNamespace);
-
-                    readLines.Add($"// {propName}");
-                    readLines.Add($"{propName} = new List<{genericTypeArg}>();");
-                    readLines.Add($"int {propName.ToLower()}Count = reader.ReadInt();");
-                    readLines.Add($"");
-                    readLines.Add($"for (int i = 0; i < {propName.ToLower()}Count; i++)");
-                    readLines.Add($"{{");
-                    readLines.Add($"    {propName}.Add(reader.Read{readMethodSuffix}());");
-                    readLines.Add($"}}");
-                }
-                else
-                {
-                    context.Warn(property, $"Type {property.Type} not supported. Manually implement the write and read operations in the Write and Read overrides to get rid of this warning.");
-                    return null;
-                }
-            }
-            else
-            {
-                readLines.Add($"{property.Name} = reader.Read{suffix}();");
-            }  
+            GenerateRead(
+                context,
+                property.Type,
+                property.Name,
+                readLines,
+                namespaces,
+                "");
         }
 
         var usings = string.Join("\n", namespaces.Select(ns => $"using {ns};"));
@@ -131,5 +87,255 @@ public partial class {{className}}
 """;
 
         return sourceCode;
+    }
+
+    private static void GenerateWrite(
+    SourceProductionContext context,
+    ITypeSymbol type,
+    string valueExpression,
+    List<string> writeLines,
+    string indent,
+    int depth = 0)
+    {
+        string? suffix =
+            ReadMethodSuffix.Get(type.SpecialType)
+            ?? ReadMethodSuffix.Get(type);
+
+        // Primitive
+        if (suffix != null)
+        {
+            writeLines.Add($"{indent}writer.Write({valueExpression});");
+            return;
+        }
+
+        if (type is not INamedTypeSymbol namedType || !namedType.IsGenericType)
+        {
+            context.Info($"Type {type.ToDisplayString()} is not supported. Implement Write manually.");
+            return;
+        }
+
+        // List<T>
+        if (namedType.Name == "List")
+        {
+            ITypeSymbol elementType = namedType.TypeArguments[0];
+
+            string countVar = $"{valueExpression}.Count";
+            string loopIndex = $"i{depth}";
+            string elementAccess = $"{valueExpression}[{loopIndex}]";
+
+            writeLines.Add($"{indent}writer.Write({countVar});");
+            writeLines.Add("");
+
+            writeLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
+            writeLines.Add($"{indent}{{");
+
+            string? elementSuffix =
+                ReadMethodSuffix.Get(elementType.SpecialType)
+                ?? ReadMethodSuffix.Get(elementType);
+
+            if (elementSuffix != null)
+            {
+                writeLines.Add($"{indent}    writer.Write({elementAccess});");
+            }
+            else
+            {
+                GenerateWrite(
+                    context,
+                    elementType,
+                    elementAccess,
+                    writeLines,
+                    indent + "    ",
+                    depth + 1);
+            }
+
+            writeLines.Add($"{indent}}}");
+            return;
+        }
+
+        // Dictionary<TKey, TValue>
+        if (namedType.Name == "Dictionary")
+        {
+            ITypeSymbol keyType = namedType.TypeArguments[0];
+            ITypeSymbol valueType = namedType.TypeArguments[1];
+
+            string loopIndex = $"i{depth}";
+            string kvVar = $"kv{depth}";
+
+            writeLines.Add($"{indent}writer.Write({valueExpression}.Count);");
+            writeLines.Add("");
+
+            writeLines.Add($"{indent}foreach (var {kvVar} in {valueExpression})");
+            writeLines.Add($"{indent}{{");
+
+            GenerateWrite(
+                context,
+                keyType,
+                $"{kvVar}.Key",
+                writeLines,
+                indent + "    ",
+                depth + 1);
+
+            writeLines.Add("");
+
+            GenerateWrite(
+                context,
+                valueType,
+                $"{kvVar}.Value",
+                writeLines,
+                indent + "    ",
+                depth + 1);
+
+            writeLines.Add($"{indent}}}");
+            return;
+        }
+
+        context.Info($"Type {type.ToDisplayString()} is not supported. Implement Write manually.");
+    }
+
+    private static void GenerateRead(
+    SourceProductionContext context,
+    ITypeSymbol type,
+    string targetExpression,
+    List<string> readLines,
+    HashSet<string> namespaces,
+    string indent,
+    int depth = 0,
+    string? rootName = null)
+    {
+        rootName ??= targetExpression;
+
+        string? suffix =
+            ReadMethodSuffix.Get(type.SpecialType)
+            ?? ReadMethodSuffix.Get(type);
+
+        // Primitive
+        if (suffix != null)
+        {
+            readLines.Add($"{indent}{targetExpression} = reader.Read{suffix}();");
+            return;
+        }
+
+        if (type is not INamedTypeSymbol namedType || !namedType.IsGenericType)
+        {
+            context.Info($"Type {type.ToDisplayString()} is not supported. Implement Read manually.");
+            return;
+        }
+
+        // List<T>
+        if (namedType.Name == "List")
+        {
+            namespaces.Add("System.Collections.Generic");
+
+            ITypeSymbol elementType = namedType.TypeArguments[0];
+            string elementTypeName =
+                elementType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+
+            string countVar =
+                depth == 0
+                    ? $"{char.ToLowerInvariant(rootName[0])}{rootName.Substring(1)}Count"
+                    : $"count{depth}";
+
+            string loopIndex = $"i{depth}";
+            string elementVar = $"element{depth}";
+
+            readLines.Add($"{indent}{targetExpression} = new List<{elementTypeName}>();");
+            readLines.Add($"{indent}int {countVar} = reader.ReadInt();");
+            readLines.Add("");
+
+            readLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
+            readLines.Add($"{indent}{{");
+
+            string? elementSuffix =
+                ReadMethodSuffix.Get(elementType.SpecialType)
+                ?? ReadMethodSuffix.Get(elementType);
+
+            if (elementSuffix != null)
+            {
+                readLines.Add($"{indent}    {targetExpression}.Add(reader.Read{elementSuffix}());");
+            }
+            else
+            {
+                readLines.Add($"{indent}    {elementTypeName} {elementVar} = new {elementTypeName}();");
+
+                GenerateRead(
+                    context,
+                    elementType,
+                    elementVar,
+                    readLines,
+                    namespaces,
+                    indent + "    ",
+                    depth + 1,
+                    rootName);
+
+                readLines.Add("");
+                readLines.Add($"{indent}    {targetExpression}.Add({elementVar});");
+            }
+
+            readLines.Add($"{indent}}}");
+            return;
+        }
+
+        // Dictionary<TKey, TValue>
+        if (namedType.Name == "Dictionary")
+        {
+            namespaces.Add("System.Collections.Generic");
+
+            ITypeSymbol keyType = namedType.TypeArguments[0];
+            ITypeSymbol valueType = namedType.TypeArguments[1];
+
+            string keyTypeName =
+                keyType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+            string valueTypeName =
+                valueType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+
+            string countVar =
+                depth == 0
+                    ? $"{char.ToLowerInvariant(rootName[0])}{rootName.Substring(1)}Count"
+                    : $"count{depth}";
+
+            string loopIndex = $"i{depth}";
+            string keyVar = $"key{depth}";
+            string valueVar = $"value{depth}";
+
+            readLines.Add($"{indent}{targetExpression} = new Dictionary<{keyTypeName}, {valueTypeName}>();");
+            readLines.Add($"{indent}int {countVar} = reader.ReadInt();");
+            readLines.Add("");
+
+            readLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
+            readLines.Add($"{indent}{{");
+
+            readLines.Add($"{indent}    {keyTypeName} {keyVar};");
+            readLines.Add($"{indent}    {valueTypeName} {valueVar};");
+            readLines.Add("");
+
+            GenerateRead(
+                context,
+                keyType,
+                keyVar,
+                readLines,
+                namespaces,
+                indent + "    ",
+                depth + 1,
+                rootName);
+
+            readLines.Add("");
+
+            GenerateRead(
+                context,
+                valueType,
+                valueVar,
+                readLines,
+                namespaces,
+                indent + "    ",
+                depth + 1,
+                rootName);
+
+            readLines.Add("");
+            readLines.Add($"{indent}    {targetExpression}.Add({keyVar}, {valueVar});");
+            readLines.Add($"{indent}}}");
+            return;
+        }
+
+        context.Info($"Type {type.ToDisplayString()} is not supported. Implement Read manually.");
     }
 }
