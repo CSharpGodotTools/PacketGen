@@ -49,7 +49,13 @@ internal class PacketReadWriteMethodsGenerator
 
         foreach (IPropertySymbol property in properties)
         {
-            string suffix = Utils.GetReadMethodSuffix(property);
+            string? suffix = ReadMethodSuffix.Get(property);
+
+            if (suffix == null)
+            {
+                context.Warn(property, $"Type {property.Type} not supported. Manually implement the write and read operations in the Write and Read overrides to get rid of this warning.");
+                return null;
+            }
 
             readLines.Add($"{property.Name} = reader.Read{suffix}();");
         }

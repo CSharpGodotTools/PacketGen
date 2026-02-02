@@ -3,9 +3,9 @@ using System;
 
 namespace PacketGen.Utilities;
 
-internal class Utils
+internal class ReadMethodSuffix
 {
-    public static string GetReadMethodSuffix(IPropertySymbol property)
+    public static string? Get(IPropertySymbol property)
     {
         string? readMethodSuffix = property.Type.SpecialType switch
         {
@@ -35,7 +35,7 @@ internal class Utils
                 "byte[]" => "Bytes",
                 "Godot.Vector2" => "Vector2",
                 "Godot.Vector3" => "Vector3",
-                _ => throw new NotSupportedException($"Type {property.Type} not supported")
+                _ => null
             };
         }
 

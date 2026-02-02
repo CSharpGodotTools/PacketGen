@@ -11,7 +11,7 @@
 
     <!-- Package Settings -->
     <PropertyGroup>
-        <Version>1.0.2</Version>
+        <Version>1.0.5</Version>
         <Description>Source generators for CSharpGodotTools/Template</Description>
         <Authors>Valkyrienyanko</Authors>
         <PackageTags>Godot C# SourceGenerator</PackageTags>
@@ -35,9 +35,6 @@
 
     <!-- Post Build Copy Local NuGet -->
     <Target Name="CopyLocalNuget" AfterTargets="Pack">
-        <Copy
-          SourceFiles="$(OutputPath)..\$(PackageId).$(PackageVersion).nupkg"
-          DestinationFiles="C:\Users\Valk\Documents\_Godot Projects\Template\Framework\Libraries\$(PackageId).$(PackageVersion).nupkg"
-          SkipUnchangedFiles="false" />
+        <Copy SourceFiles="$(OutputPath)..\$(PackageId).$(PackageVersion).nupkg" DestinationFiles="C:\Users\Valk\Documents\_Godot Projects\Template\Framework\Libraries\$(PackageId).$(PackageVersion).nupkg" SkipUnchangedFiles="true" />
     </Target>
 </Project>
