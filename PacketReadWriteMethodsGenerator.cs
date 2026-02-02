@@ -45,16 +45,20 @@ internal class PacketReadWriteMethodsGenerator
 
         foreach (IPropertySymbol property in properties)
         {
-            string typeStr = property.Type.ToDisplayString();
             string propName = property.Name;
 
-            if (typeStr == "System.Collections.Generic.List<int>")
+            // List<int>
+            if (property.Type is INamedTypeSymbol namedTypeSymbol && namedTypeSymbol.IsGenericType)
             {
+                ITypeSymbol typeArg = namedTypeSymbol.TypeArguments[0];
+                string genericTypeArg = typeArg.ToDisplayString(); // int
+
+                writeLines.Add($"// {propName}");
                 writeLines.Add($"writer.Write({propName}.Count);");
                 writeLines.Add($"");
                 writeLines.Add($"for (int i = 0; i < {propName}.Count; i++)");
                 writeLines.Add($"{{");
-                writeLines.Add($"    writer.Write({propName}[i]);");
+                writeLines.Add($"    writer.Write<{genericTypeArg}>({propName}[i]);");
                 writeLines.Add($"}}");
             }
             else
@@ -65,24 +69,32 @@ internal class PacketReadWriteMethodsGenerator
 
         foreach (IPropertySymbol property in properties)
         {
-            string? suffix = ReadMethodSuffix.Get(property);
+            string? suffix = ReadMethodSuffix.Get(property.Type.SpecialType);
+            suffix ??= ReadMethodSuffix.Get(property.Type);
+
             string propName = property.Name;
 
             if (suffix == null)
             {
-                string typeStr = property.Type.ToDisplayString();
-
-                if (typeStr == "System.Collections.Generic.List<int>")
+                // List<int>
+                if (property.Type is INamedTypeSymbol namedTypeSymbol && namedTypeSymbol.IsGenericType)
                 {
-                    readLines.Add($"{propName} = new List<int>();");
+                    ITypeSymbol typeArg = namedTypeSymbol.TypeArguments[0];
+                    string genericTypeArg = typeArg.ToDisplayString(); // int
+                    string genericNamespace = namedTypeSymbol.ContainingNamespace.ToDisplayString(); // System.Collections.Generic
+                    string? readMethodSuffix = ReadMethodSuffix.Get(typeArg.SpecialType); // Int
+                    readMethodSuffix ??= ReadMethodSuffix.Get(typeArg); // byte[]
+
+                    namespaces.Add(genericNamespace);
+
+                    readLines.Add($"// {propName}");
+                    readLines.Add($"{propName} = new List<{genericTypeArg}>();");
                     readLines.Add($"int {propName.ToLower()}Count = reader.ReadInt();");
                     readLines.Add($"");
                     readLines.Add($"for (int i = 0; i < {propName.ToLower()}Count; i++)");
                     readLines.Add($"{{");
-                    readLines.Add($"    {propName}.Add(reader.ReadInt());");
+                    readLines.Add($"    {propName}.Add(reader.Read{readMethodSuffix}());");
                     readLines.Add($"}}");
-
-                    namespaces.Add("System.Collections.Generic");
                 }
                 else
                 {

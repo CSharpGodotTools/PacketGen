@@ -1,15 +1,16 @@
 ﻿using Microsoft.CodeAnalysis;
 using System;
+using System.Reflection.Metadata;
 
 namespace PacketGen.Utilities;
 
+// See Framework.Netcode.PacketReader for all read methods
 internal class ReadMethodSuffix
 {
-    public static string? Get(IPropertySymbol property)
+    public static string? Get(SpecialType type)
     {
-        string? readMethodSuffix = property.Type.SpecialType switch
+        return type switch
         {
-            // See Framework.Netcode.PacketReader for all read methods
             SpecialType.System_Byte => "Byte",
             SpecialType.System_SByte => "SByte",
             SpecialType.System_Char => "Char",
@@ -25,20 +26,16 @@ internal class ReadMethodSuffix
             SpecialType.System_UInt64 => "ULong",
             _ => null
         };
+    }
 
-        if (readMethodSuffix == null)
+    public static string? Get(ITypeSymbol symbol)
+    {
+        return symbol.ToDisplayString() switch
         {
-            var typeName = property.Type.ToDisplayString();
-
-            readMethodSuffix = typeName switch
-            {
-                "byte[]" => "Bytes",
-                "Godot.Vector2" => "Vector2",
-                "Godot.Vector3" => "Vector3",
-                _ => null
-            };
-        }
-
-        return readMethodSuffix;
+            "byte[]" => "Bytes",
+            "Godot.Vector2" => "Vector2",
+            "Godot.Vector3" => "Vector3",
+            _ => null
+        };
     }
 }
