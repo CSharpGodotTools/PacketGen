@@ -45,23 +45,12 @@ internal class PacketReadWriteMethodsGenerator
 
         foreach (IPropertySymbol property in properties)
         {
-            GenerateWrite(
-                context,
-                property.Type,
-                property.Name,
-                writeLines,
-                "");
+            GenerateWrite(context, property.Type, property.Name, writeLines, "");
         }
 
         foreach (IPropertySymbol property in properties)
         {
-            GenerateRead(
-                context,
-                property.Type,
-                property.Name,
-                readLines,
-                namespaces,
-                "");
+            GenerateRead(context, property.Type, property.Name, readLines, namespaces, "");
         }
 
         var usings = string.Join("\n", namespaces.Select(ns => $"using {ns};"));
@@ -90,12 +79,12 @@ public partial class {{className}}
     }
 
     private static void GenerateWrite(
-    SourceProductionContext context,
-    ITypeSymbol type,
-    string valueExpression,
-    List<string> writeLines,
-    string indent,
-    int depth = 0)
+        SourceProductionContext context,
+        ITypeSymbol type,
+        string valueExpression,
+        List<string> writeLines,
+        string indent,
+        int depth = 0)
     {
         string? suffix =
             ReadMethodSuffix.Get(type.SpecialType)
@@ -123,6 +112,9 @@ public partial class {{className}}
             string loopIndex = $"i{depth}";
             string elementAccess = $"{valueExpression}[{loopIndex}]";
 
+            if (depth == 0)
+                writeLines.Add($"{indent}#region {valueExpression}");
+
             writeLines.Add($"{indent}writer.Write({countVar});");
             writeLines.Add("");
 
@@ -149,6 +141,10 @@ public partial class {{className}}
             }
 
             writeLines.Add($"{indent}}}");
+
+            if (depth == 0)
+                writeLines.Add($"{indent}#endregion");
+
             return;
         }
 
@@ -161,6 +157,10 @@ public partial class {{className}}
             string loopIndex = $"i{depth}";
             string kvVar = $"kv{depth}";
 
+            if (depth == 0)
+                writeLines.Add($"{indent}#region {valueExpression}");
+
+            writeLines.Add($"{indent}// {valueExpression}");
             writeLines.Add($"{indent}writer.Write({valueExpression}.Count);");
             writeLines.Add("");
 
@@ -186,6 +186,10 @@ public partial class {{className}}
                 depth + 1);
 
             writeLines.Add($"{indent}}}");
+
+            if (depth == 0)
+                writeLines.Add($"{indent}#endregion");
+
             return;
         }
 
@@ -193,14 +197,14 @@ public partial class {{className}}
     }
 
     private static void GenerateRead(
-    SourceProductionContext context,
-    ITypeSymbol type,
-    string targetExpression,
-    List<string> readLines,
-    HashSet<string> namespaces,
-    string indent,
-    int depth = 0,
-    string? rootName = null)
+        SourceProductionContext context,
+        ITypeSymbol type,
+        string targetExpression,
+        List<string> readLines,
+        HashSet<string> namespaces,
+        string indent,
+        int depth = 0,
+        string? rootName = null)
     {
         rootName ??= targetExpression;
 
@@ -238,6 +242,9 @@ public partial class {{className}}
             string loopIndex = $"i{depth}";
             string elementVar = $"element{depth}";
 
+            if (depth == 0)
+                readLines.Add($"{indent}#region {targetExpression}");
+
             readLines.Add($"{indent}{targetExpression} = new List<{elementTypeName}>();");
             readLines.Add($"{indent}int {countVar} = reader.ReadInt();");
             readLines.Add("");
@@ -272,6 +279,10 @@ public partial class {{className}}
             }
 
             readLines.Add($"{indent}}}");
+
+            if (depth == 0)
+                readLines.Add($"{indent}#endregion");
+
             return;
         }
 
@@ -296,6 +307,9 @@ public partial class {{className}}
             string loopIndex = $"i{depth}";
             string keyVar = $"key{depth}";
             string valueVar = $"value{depth}";
+
+            if (depth == 0)
+                readLines.Add($"{indent}#region {targetExpression}");
 
             readLines.Add($"{indent}{targetExpression} = new Dictionary<{keyTypeName}, {valueTypeName}>();");
             readLines.Add($"{indent}int {countVar} = reader.ReadInt();");
@@ -333,6 +347,10 @@ public partial class {{className}}
             readLines.Add("");
             readLines.Add($"{indent}    {targetExpression}.Add({keyVar}, {valueVar});");
             readLines.Add($"{indent}}}");
+
+            if (depth == 0)
+                readLines.Add($"{indent}#endregion");
+
             return;
         }
 
