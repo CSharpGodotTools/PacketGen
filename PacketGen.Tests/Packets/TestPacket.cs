@@ -4,5 +4,5 @@ namespace Framework.Netcode.Tests;
 
 partial class TestPacket : ServerPacket
 {
-    public uint Id { get; set; }
+    public List<int> MyList { get; set; }
 }
