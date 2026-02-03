@@ -55,7 +55,7 @@ public class SourceGeneratorTests
             }
             """;
 
-        const string expectedGenerated = """
+        const string expectedPacketGenerated = """
             using System.Collections.Generic;
 
             namespace Framework.Netcode.Tests;
@@ -90,15 +90,59 @@ public class SourceGeneratorTests
 
             """;
 
-        var test = new CSharpSourceGeneratorTest<PacketGen.Program, XUnitVerifier>
+        const string expectedRegistryGenerated = """
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+            using Framework.Netcode.Tests;
+
+            namespace Framework.Netcode;
+
+            public static partial class PacketRegistry
+            {
+                public static readonly Dictionary<Type, PacketInfo<ClientPacket>> ClientPacketInfo;
+                public static readonly Dictionary<byte, Type> ClientPacketTypes;
+                public static readonly Dictionary<Type, PacketInfo<ServerPacket>> ServerPacketInfo;
+                public static readonly Dictionary<byte, Type> ServerPacketTypes;
+
+                static PacketRegistry()
+                {
+                    ClientPacketInfo = new Dictionary<Type, PacketInfo<ClientPacket>>()
+                    {
+                        
+                    };
+
+                    ClientPacketTypes = ClientPacketInfo.ToDictionary(kvp => kvp.Value.Opcode, kvp => kvp.Key);
+
+                    ServerPacketInfo = new Dictionary<Type, PacketInfo<ServerPacket>>()
+                    {
+                        
+                        {
+                            typeof(TestPacket),
+                            new PacketInfo<ServerPacket>
+                            {
+                                Opcode = 0,
+                                Instance = new TestPacket()
+                            }
+                        }
+                    };
+
+                    ServerPacketTypes = ServerPacketInfo.ToDictionary(kvp => kvp.Value.Opcode, kvp => kvp.Key);
+                }
+            }
+
+            """;
+
+        var test = new CSharpIncrementalGeneratorTest<PacketGen.Program, XUnitVerifier>
         {
-            ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
+            ReferenceAssemblies = ReferenceAssemblies.Net.Net60,
             TestState =
             {
                 Sources = { netcodeStubs, packetSource },
                 GeneratedSources =
                 {
-                    (typeof(PacketGen.Program), "TestPacket.g.cs", expectedGenerated),
+                    (typeof(PacketGen.Program), "TestPacket.g.cs", expectedPacketGenerated),
+                    (typeof(PacketGen.Program), "PacketRegistry.g.cs", expectedRegistryGenerated),
                 },
             },
         };
