@@ -1,10 +1,14 @@
-using Microsoft.CodeAnalysis.CSharp.Testing;
-using Microsoft.CodeAnalysis.Testing;
-using Microsoft.CodeAnalysis.Testing.Verifiers;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
+using VerifyXunit;
 using Xunit;
 
 namespace PacketGen.Tests;
 
+[UsesVerify]
 public class SourceGeneratorTests
 {
     [Fact]
@@ -55,98 +59,36 @@ public class SourceGeneratorTests
             }
             """;
 
-        const string expectedPacketGenerated = """
-            using System.Collections.Generic;
+        var compilation = CreateCompilation(new[] { netcodeStubs, packetSource });
+        var generator = new PacketGen.Program();
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
+        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out _, out _);
 
-            namespace Framework.Netcode.Tests;
+        var result = driver.GetRunResult();
+        var generatedSources = result.Results
+            .SelectMany(runResult => runResult.GeneratedSources)
+            .OrderBy(source => source.HintName)
+            .ToDictionary(source => source.HintName, source => source.SourceText.ToString());
 
-            public partial class TestPacket
-            {
-                public override void Write(PacketWriter writer)
-                {
-                    #region MyList
-                    writer.Write(MyList.Count);
+        await Verifier.Verify(generatedSources);
+    }
 
-                    for (int i0 = 0; i0 < MyList.Count; i0++)
-                    {
-                        writer.Write(MyList[i0]);
-                    }
-                    #endregion
-                }
-
-                public override void Read(PacketReader reader)
-                {
-                    #region MyList
-                    MyList = new List<int>();
-                    int myListCount = reader.ReadInt();
-
-                    for (int i0 = 0; i0 < myListCount; i0++)
-                    {
-                        MyList.Add(reader.ReadInt());
-                    }
-                    #endregion
-                }
-            }
-
-            """;
-
-        const string expectedRegistryGenerated = """
-            using System;
-            using System.Collections.Generic;
-            using System.Linq;
-            using Framework.Netcode.Tests;
-
-            namespace Framework.Netcode;
-
-            public static partial class PacketRegistry
-            {
-                public static readonly Dictionary<Type, PacketInfo<ClientPacket>> ClientPacketInfo;
-                public static readonly Dictionary<byte, Type> ClientPacketTypes;
-                public static readonly Dictionary<Type, PacketInfo<ServerPacket>> ServerPacketInfo;
-                public static readonly Dictionary<byte, Type> ServerPacketTypes;
-
-                static PacketRegistry()
-                {
-                    ClientPacketInfo = new Dictionary<Type, PacketInfo<ClientPacket>>()
-                    {
-                        
-                    };
-
-                    ClientPacketTypes = ClientPacketInfo.ToDictionary(kvp => kvp.Value.Opcode, kvp => kvp.Key);
-
-                    ServerPacketInfo = new Dictionary<Type, PacketInfo<ServerPacket>>()
-                    {
-                        
-                        {
-                            typeof(TestPacket),
-                            new PacketInfo<ServerPacket>
-                            {
-                                Opcode = 0,
-                                Instance = new TestPacket()
-                            }
-                        }
-                    };
-
-                    ServerPacketTypes = ServerPacketInfo.ToDictionary(kvp => kvp.Value.Opcode, kvp => kvp.Key);
-                }
-            }
-
-            """;
-
-        var test = new CSharpIncrementalGeneratorTest<PacketGen.Program, XUnitVerifier>
+    private static Compilation CreateCompilation(IEnumerable<string> sources)
+    {
+        var syntaxTrees = sources.Select(source => CSharpSyntaxTree.ParseText(source));
+        var references = new[]
         {
-            ReferenceAssemblies = ReferenceAssemblies.Net.Net60,
-            TestState =
-            {
-                Sources = { netcodeStubs, packetSource },
-                GeneratedSources =
-                {
-                    (typeof(PacketGen.Program), "TestPacket.g.cs", expectedPacketGenerated),
-                    (typeof(PacketGen.Program), "PacketRegistry.g.cs", expectedRegistryGenerated),
-                },
-            },
+            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(List<>).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(ImmutableArray).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(System.Runtime.GCSettings).Assembly.Location),
         };
 
-        await test.RunAsync();
+        return CSharpCompilation.Create(
+            "PacketGen.GeneratedTests",
+            syntaxTrees,
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 }
