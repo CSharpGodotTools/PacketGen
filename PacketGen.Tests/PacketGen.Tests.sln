@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.2.11415.280 d18.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PacketGen.Tests", "PacketGen.Tests.csproj", "{A0D88AB9-BC9A-A91B-2B2F-5F779B89996C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PacketGen", "..\PacketGen\PacketGen.csproj", "{09349170-2B8C-E885-4F45-731D7F3107CE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A0D88AB9-BC9A-A91B-2B2F-5F779B89996C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A0D88AB9-BC9A-A91B-2B2F-5F779B89996C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A0D88AB9-BC9A-A91B-2B2F-5F779B89996C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A0D88AB9-BC9A-A91B-2B2F-5F779B89996C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{09349170-2B8C-E885-4F45-731D7F3107CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{09349170-2B8C-E885-4F45-731D7F3107CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{09349170-2B8C-E885-4F45-731D7F3107CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{09349170-2B8C-E885-4F45-731D7F3107CE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4997B108-226E-4FB0-9F21-26C50F90505F}
+	EndGlobalSection
+EndGlobal

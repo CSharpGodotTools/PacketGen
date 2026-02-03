@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
 
 namespace PacketGen;
@@ -25,6 +26,8 @@ internal class Program : IIncrementalGenerator
 
     private void Execute(SourceProductionContext context, (Compilation Left, ImmutableArray<ClassDeclarationSyntax> Right) tuple)
     {
+        Logger.Init(context);
+
         var (compilation, list) = tuple;
 
         var clientSymbols = new List<INamedTypeSymbol>();
@@ -44,7 +47,7 @@ internal class Program : IIncrementalGenerator
             {
                 clientSymbols.Add(symbol);
 
-                string? sourceCode = PacketReadWriteMethodsGenerator.GetSource(context, symbol);
+                string? sourceCode = PacketReadWriteMethodsGenerator.GetSource(context, compilation, symbol);
 
                 if (sourceCode != null)
                     // For example: CPacketPlayerInfo.g.cs
@@ -55,7 +58,7 @@ internal class Program : IIncrementalGenerator
             {
                 serverSymbols.Add(symbol);
 
-                string? sourceCode = PacketReadWriteMethodsGenerator.GetSource(context, symbol);
+                string? sourceCode = PacketReadWriteMethodsGenerator.GetSource(context, compilation, symbol);
 
                 if (sourceCode != null)
                     // For example: SPacketPlayerPositions.g.cs

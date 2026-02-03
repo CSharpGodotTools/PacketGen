@@ -1,5 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
 using PacketGen.Utilities;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -7,7 +8,7 @@ namespace PacketGen;
 
 internal class PacketReadWriteMethodsGenerator
 {
-    public static string? GetSource(SourceProductionContext context, INamedTypeSymbol symbol)
+    public static string? GetSource(SourceProductionContext context, Compilation compilation, INamedTypeSymbol symbol)
     {
         List<IPropertySymbol> properties = [];
         bool hasWriteReadMethods = false;
@@ -19,13 +20,12 @@ internal class PacketReadWriteMethodsGenerator
                 var attributes = property.GetAttributes();
 
                 // Ignore properties with the [NetExclude] attribute
-                if (!attributes.Any(attr => attr.AttributeClass?.Name == "NetExcludeAttribute"))
-                {
-                    properties.Add(property);
-                }
-            }
+                if (attributes.Any(attr => attr.AttributeClass?.Name == "NetExcludeAttribute"))
+                    continue;
 
-            if (member is IMethodSymbol method)
+                properties.Add(property);
+            } 
+            else if (member is IMethodSymbol method)
             {
                 // Do not generate anything if Write or Read methods exist already
                 if (method.Name == "Write" || method.Name == "Read")
@@ -45,12 +45,12 @@ internal class PacketReadWriteMethodsGenerator
 
         foreach (IPropertySymbol property in properties)
         {
-            GenerateWrite(context, property.Type, property.Name, writeLines, "");
+            GenerateWrite(compilation, property, property.Type, property.Name, writeLines, "");
         }
 
         foreach (IPropertySymbol property in properties)
         {
-            GenerateRead(context, property.Type, property.Name, readLines, namespaces, "");
+            GenerateRead(property, property.Type, property.Name, readLines, namespaces, "");
         }
 
         var usings = string.Join("\n", namespaces.Select(ns => $"using {ns};"));
@@ -78,8 +78,41 @@ public partial class {{className}}
         return sourceCode;
     }
 
+    private static string? GetAddMethodName(INamedTypeSymbol collectionType, Compilation compilation)
+    {
+        // `1 because only focusing on generics with 1 type parameter
+        var iCollectionOpen = compilation.GetTypeByMetadataName("System.Collections.Generic.ICollection`1");
+
+        if (collectionType.TypeArguments.Length != 1)
+            return null;
+
+        if (iCollectionOpen == null)
+            return null;
+
+        // Construct ICollection<TypeArg> from ICollection<T>
+        ITypeSymbol elementType = collectionType.TypeArguments[0];
+        var iCollection = iCollectionOpen.Construct(elementType);
+
+        var interfaceAdd = iCollection
+            .GetMembers("Add")
+            .OfType<IMethodSymbol>()
+            .FirstOrDefault(m => m.Parameters.Length == 1);
+
+        if (interfaceAdd == null)
+            return null;
+
+        var concreteAdd = collectionType
+            .FindImplementationForInterfaceMember(interfaceAdd) as IMethodSymbol;
+
+        if (concreteAdd == null)
+            return null;
+
+        return concreteAdd.Name;
+    }
+
     private static void GenerateWrite(
-        SourceProductionContext context,
+        Compilation compilation,
+        IPropertySymbol property,
         ITypeSymbol type,
         string valueExpression,
         List<string> writeLines,
@@ -97,9 +130,11 @@ public partial class {{className}}
 
         if (type is not INamedTypeSymbol namedType || !namedType.IsGenericType)
         {
-            context.Info($"Type {type.ToDisplayString()} is not supported. Implement Write manually.");
+            Logger.Info($"Type {type.ToDisplayString()} is not supported. Implement Write manually.");
             return;
         }
+
+        //Logger.Info(property, property.Name + ": " + GetAddMethodName(namedType, compilation));
 
         // List<T>
         if (namedType.Name == "List")
@@ -128,7 +163,8 @@ public partial class {{className}}
             else
             {
                 GenerateWrite(
-                    context,
+                    compilation,
+                    property,
                     elementType,
                     elementAccess,
                     writeLines,
@@ -163,7 +199,8 @@ public partial class {{className}}
             writeLines.Add($"{indent}{{");
 
             GenerateWrite(
-                context,
+                compilation,
+                property,
                 keyType,
                 $"{kvVar}.Key",
                 writeLines,
@@ -173,7 +210,8 @@ public partial class {{className}}
             writeLines.Add("");
 
             GenerateWrite(
-                context,
+                compilation,
+                property,
                 valueType,
                 $"{kvVar}.Value",
                 writeLines,
@@ -188,11 +226,11 @@ public partial class {{className}}
             return;
         }
 
-        context.Info($"Type {type.ToDisplayString()} is not supported. Implement Write manually.");
+        Logger.Info(property, $"Type {type.ToDisplayString()} is not supported. Implement Write manually.");
     }
 
     private static void GenerateRead(
-        SourceProductionContext context,
+        IPropertySymbol property,
         ITypeSymbol type,
         string targetExpression,
         List<string> readLines,
@@ -214,7 +252,7 @@ public partial class {{className}}
 
         if (type is not INamedTypeSymbol namedType || !namedType.IsGenericType)
         {
-            context.Info($"Type {type.ToDisplayString()} is not supported. Implement Read manually.");
+            Logger.Info(type, $"Type {type.ToDisplayString()} is not supported. Implement Read manually.");
             return;
         }
 
@@ -262,7 +300,7 @@ public partial class {{className}}
                 readLines.Add($"{indent}    {elementTypeName} {elementVar} = new {elementTypeName}();");
 
                 GenerateRead(
-                    context,
+                    property,
                     elementType,
                     elementVar,
                     readLines,
@@ -323,7 +361,7 @@ public partial class {{className}}
 
             // Read key0
             GenerateRead(
-                context,
+                property,
                 keyType,
                 keyVar,
                 readLines,
@@ -336,7 +374,7 @@ public partial class {{className}}
 
             // Read value0
             GenerateRead(
-                context,
+                property,
                 valueType,
                 valueVar,
                 readLines,
@@ -356,6 +394,6 @@ public partial class {{className}}
             return;
         }
 
-        context.Info($"Type {type.ToDisplayString()} is not supported. Implement Read manually.");
+        Logger.Info(property, $"Type {type.ToDisplayString()} is not supported. Implement Read manually.");
     }
 }

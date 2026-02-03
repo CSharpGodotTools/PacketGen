@@ -69,7 +69,7 @@ using System.Linq;
 
 namespace Framework.Netcode;
 
-public static class PacketRegistry
+public static partial class PacketRegistry
 {
     public static readonly Dictionary<Type, PacketInfo<ClientPacket>> ClientPacketInfo;
     public static readonly Dictionary<byte, Type> ClientPacketTypes;
