@@ -70,6 +70,7 @@ public class SourceGeneratorTests
             .OrderBy(source => source.HintName)
             .ToDictionary(source => source.HintName, source => source.SourceText.ToString());
 
+        // Snapshot test: run `dotnet test` to create baseline files, then re-run to compare changes.
         await Verifier.Verify(generatedSources);
     }
 
