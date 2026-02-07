@@ -6,9 +6,9 @@ using System.Linq;
 public static class PacketRegistryGenerator
 {
     public static string GetSource(
-        INamedTypeSymbol registryClassSymbol, 
-        string idTypeName, 
-        List<INamedTypeSymbol> clientSymbols, 
+        INamedTypeSymbol registryClassSymbol,
+        string idTypeName,
+        List<INamedTypeSymbol> clientSymbols,
         List<INamedTypeSymbol> serverSymbols)
     {
         // Sort symbols by their display strings to ensure opcodes are always in a deterministic order

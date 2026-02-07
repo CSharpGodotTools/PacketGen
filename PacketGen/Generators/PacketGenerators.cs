@@ -1,9 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using PacketGen.Utilities;
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Linq;
 
 namespace PacketGen;
@@ -26,7 +24,7 @@ internal class PacketGenerators
                     continue;
 
                 properties.Add(property);
-            } 
+            }
             else if (member is IMethodSymbol method)
             {
                 // Do not generate anything if Write or Read methods exist already

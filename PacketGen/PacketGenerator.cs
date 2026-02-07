@@ -1,8 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Linq;
 
 namespace PacketGen;
@@ -13,11 +11,10 @@ public sealed class PacketGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         IncrementalValuesProvider<INamedTypeSymbol> packetSymbols = GetPacketSymbols(context);
-
         IncrementalValuesProvider<INamedTypeSymbol> clientPackets = packetSymbols.Where(static s => s.BaseType!.Name == "ClientPacket");
         IncrementalValuesProvider<INamedTypeSymbol> serverPackets = packetSymbols.Where(static s => s.BaseType!.Name == "ServerPacket");
 
-        var compilation = context.CompilationProvider;
+        IncrementalValueProvider<Compilation> compilation = context.CompilationProvider;
 
         // Per-packet script source generation
         GenerateSourceForPacketScripts(context, clientPackets, compilation);
