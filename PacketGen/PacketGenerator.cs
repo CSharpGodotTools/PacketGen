@@ -60,7 +60,7 @@ public sealed class PacketGenerator : IIncrementalGenerator
                 Compilation compilationValue = pair.Right;
 
                 string? source =
-                    PacketReadWriteMethodsGenerator.GetSource(compilationValue, symbol);
+                    PacketGenerators.GetSource(compilationValue, symbol);
 
                 if (source is not null)
                     spc.AddSource($"{symbol.Name}.g.cs", source);

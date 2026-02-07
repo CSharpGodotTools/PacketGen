@@ -7,7 +7,7 @@ using System.Linq;
 
 namespace PacketGen;
 
-internal class PacketReadWriteMethodsGenerator
+internal class PacketGenerators
 {
     public static string? GetSource(Compilation compilation, INamedTypeSymbol symbol)
     {
