@@ -69,7 +69,7 @@ public partial class {{className}}
     public override void Read(PacketReader reader)
     {
 {{string.Join("\n", readLines.Select(line => indent8 + line))}}
-    }s
+    }
 }
 
 """;
