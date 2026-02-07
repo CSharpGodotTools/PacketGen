@@ -136,7 +136,15 @@ public class GeneratorTestResult(string generatedSource, string generatedFile, H
         // Add common references usually needed by generated code
         references.Add(MetadataReference.CreateFromFile(typeof(object).Assembly.Location));
         references.Add(MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location));
-        references.Add(MetadataReference.CreateFromFile(typeof(System.Runtime.AssemblyTargetedPatchBandAttribute).Assembly.Location));
+
+        // Add reference to System.Runtime.dll
+        string? trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
+        string? systemRuntimePath = trustedPlatformAssemblies?
+            .Split(Path.PathSeparator)
+            .FirstOrDefault(p => string.Equals(Path.GetFileName(p), "System.Runtime.dll", StringComparison.OrdinalIgnoreCase));
+
+        if (!string.IsNullOrWhiteSpace(systemRuntimePath))
+            references.Add(MetadataReference.CreateFromFile(systemRuntimePath));
 
         var referencePaths = references
             .OfType<PortableExecutableReference>()
