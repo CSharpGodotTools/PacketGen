@@ -22,15 +22,16 @@ internal static class GeneratedFiles
 
     public static string GetGenDir()
     {
-        string baseDir = TestContext.CurrentContext.TestDirectory;
+        string dir = Path.Combine(TestContext.CurrentContext.TestDirectory, "_Generated");
 
-        return Path.Combine(baseDir, "_Generated");
+        Directory.CreateDirectory(dir);
+
+        return dir;
     }
 
     private static string GetPath(string fileName)
     {
         string genDir = GetGenDir();
-        Directory.CreateDirectory(genDir);
 
         return Path.Combine(genDir, fileName);
     }
