@@ -18,7 +18,7 @@ internal class SimpleTests
         }
         """;
 
-        TestAdapter<PacketGenerator> test = new(testCode, "CPacketEmpty.g.cs");
+        GeneratorTest<PacketGenerator> test = new(testCode, "CPacketEmpty.g.cs");
 
         test.Start();
     }
@@ -39,9 +39,9 @@ internal class SimpleTests
         }
         """;
 
-        TestAdapter<PacketGenerator> test = new(testCode, $"{className}.g.cs");
+        GeneratorTest<PacketGenerator> test = new(testCode, $"{className}.g.cs");
 
-        TestAdapterBuilder? testBuilder = test.Start();
+        GeneratorTestResult? testBuilder = test.Start();
 
         Assert.That(testBuilder, Is.Not.Null, $"{className}.g.cs failed to generate");
     }

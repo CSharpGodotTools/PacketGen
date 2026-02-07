@@ -24,9 +24,9 @@ internal class PacketTests
         }
         """;
 
-        TestAdapter<PacketGenerator> test = new(testCode, "CPacketPlayerPosition.g.cs");
+        GeneratorTest<PacketGenerator> test = new(testCode, "CPacketPlayerPosition.g.cs");
 
-        TestAdapterBuilder? testBuilder = test.Start();
+        GeneratorTestResult? testBuilder = test.Start();
 
         Assert.That(testBuilder, Is.Not.Null, "CPacketPlayerPosition.g.cs failed to generate");
             

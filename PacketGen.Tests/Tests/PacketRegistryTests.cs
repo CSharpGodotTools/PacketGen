@@ -26,9 +26,9 @@ internal class PacketRegistryTests
         }
         """;
 
-        TestAdapter<PacketGenerator> test = new(testCode, "PacketRegistry.g.cs");
+        GeneratorTest<PacketGenerator> test = new(testCode, "PacketRegistry.g.cs");
 
-        TestAdapterBuilder? testBuilder = test.Start();
+        GeneratorTestResult? testBuilder = test.Start();
 
         Assert.That(testBuilder, Is.Not.Null, "PacketRegistry.g.cs failed to generate");
 

@@ -12,7 +12,7 @@ namespace PacketGen.Tests;
 /// </summary>
 /// <typeparam name="TGenerator">The type of source generator to test. Must implement <see cref="IIncrementalGenerator"/> and have a public
 /// parameterless constructor.</typeparam>
-internal class TestAdapter<TGenerator>(string testSource, string generatedFile) where TGenerator : IIncrementalGenerator, new()
+internal class GeneratorTest<TGenerator>(string testSource, string generatedFile) where TGenerator : IIncrementalGenerator, new()
 {
     private const string TestAssemblyName = "TestAssembly";
 
@@ -26,7 +26,7 @@ internal class TestAdapter<TGenerator>(string testSource, string generatedFile) 
         typeof(Godot.Vector3).Assembly.Location
     ];
 
-    static TestAdapter()
+    static GeneratorTest()
     {
         // Delete all old generated files before tests start again
         string genDir = GeneratedFiles.GetGenDir();
@@ -55,7 +55,7 @@ internal class TestAdapter<TGenerator>(string testSource, string generatedFile) 
     /// generated file exists. The generated file is also output to the designated directory for inspection. Use this
     /// method to obtain the generated source for further validation or analysis in source generator tests.</remarks>
     /// <returns>Returns null if the source file did not generate anything.</returns>
-    public TestAdapterBuilder? Start()
+    public GeneratorTestResult? Start()
     {
         SyntaxTree testTree = CSharpSyntaxTree.ParseText(testSource);
 
@@ -89,7 +89,7 @@ internal class TestAdapter<TGenerator>(string testSource, string generatedFile) 
         // Output the generated file to bin\Debug\net10.0\_Generated
         GeneratedFiles.Output(generatedFile, generatedSource);
 
-        return new TestAdapterBuilder(generatedSource, generatedFile);
+        return new GeneratorTestResult(generatedSource, generatedFile);
     }
 }
 
@@ -98,12 +98,12 @@ internal class TestAdapter<TGenerator>(string testSource, string generatedFile) 
 /// </summary>
 /// <param name="generatedFile">The path to the generated source file to be previewed.</param>
 /// <param name="generatedSource">The source code content that has been generated.</param>
-public class TestAdapterBuilder(string generatedSource, string generatedFile)
+public class GeneratorTestResult(string generatedSource, string generatedFile)
 {
     /// <summary>
     /// Outputs the generated source to the <paramref name="source"/> parameter.
     /// </summary>
-    public TestAdapterBuilder GetGeneratedSource(out string source)
+    public GeneratorTestResult GetGeneratedSource(out string source)
     {
         source = generatedSource;
         return this;
@@ -112,7 +112,7 @@ public class TestAdapterBuilder(string generatedSource, string generatedFile)
     /// <summary>
     /// Previews the generated source file in the active IDE.
     /// </summary>
-    public TestAdapterBuilder PreviewSource()
+    public GeneratorTestResult PreviewSource()
     {
         GeneratedFiles.Preview(generatedFile);
         return this;
