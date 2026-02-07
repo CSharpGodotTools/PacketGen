@@ -14,8 +14,6 @@ namespace PacketGen.Tests;
 /// parameterless constructor.</typeparam>
 internal class GeneratorTest<TGenerator>(string testSource, string generatedFile) where TGenerator : IIncrementalGenerator, new()
 {
-    private const string TestAssemblyName = "TestAssembly";
-
     // Metadata references
     private readonly HashSet<string> _references =
     [
@@ -60,7 +58,7 @@ internal class GeneratorTest<TGenerator>(string testSource, string generatedFile
         SyntaxTree testTree = CSharpSyntaxTree.ParseText(testSource);
 
         CSharpCompilation compilation = CSharpCompilation.Create(
-            assemblyName: TestAssemblyName,
+            assemblyName: "TestAssembly",
             syntaxTrees: [testTree],
             references: _references.Select(r => MetadataReference.CreateFromFile(r)),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
@@ -89,7 +87,7 @@ internal class GeneratorTest<TGenerator>(string testSource, string generatedFile
         // Output the generated file to bin\Debug\net10.0\_Generated
         GeneratedFiles.Output(generatedFile, generatedSource);
 
-        return new GeneratorTestResult(generatedSource, generatedFile);
+        return new GeneratorTestResult(generatedSource, generatedFile, _references, testSource);
     }
 }
 
@@ -98,7 +96,7 @@ internal class GeneratorTest<TGenerator>(string testSource, string generatedFile
 /// </summary>
 /// <param name="generatedFile">The path to the generated source file to be previewed.</param>
 /// <param name="generatedSource">The source code content that has been generated.</param>
-public class GeneratorTestResult(string generatedSource, string generatedFile)
+public class GeneratorTestResult(string generatedSource, string generatedFile, HashSet<string> _references, string testSource)
 {
     /// <summary>
     /// Outputs the generated source to the <paramref name="source"/> parameter.
@@ -116,5 +114,60 @@ public class GeneratorTestResult(string generatedSource, string generatedFile)
     {
         GeneratedFiles.Preview(generatedFile);
         return this;
+    }
+
+    public record GeneratedCompilationResult(bool Success, IEnumerable<string> ReferencePaths, ImmutableArray<Diagnostic> Diagnostics, Assembly? Assembly, Exception? AssemblyException = null);
+
+    public GeneratedCompilationResult CompileGeneratedAssembly(string generatedSource)
+    {
+        // Create syntax tree(s) for generated source
+        SyntaxTree genTree = CSharpSyntaxTree.ParseText(generatedSource);
+
+        // Combine test tree and generated tree into a new compilation
+        var references = _references.Select(r => MetadataReference.CreateFromFile(r)).ToList();
+
+        // Add common references usually needed by generated code
+        references.Add(MetadataReference.CreateFromFile(typeof(object).Assembly.Location));
+        references.Add(MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location));
+        references.Add(MetadataReference.CreateFromFile(typeof(System.Runtime.AssemblyTargetedPatchBandAttribute).Assembly.Location));
+
+        var referencePaths = references
+            .OfType<PortableExecutableReference>()
+            .Select(r => r.FilePath ?? string.Empty)
+            .Where(p => !string.IsNullOrEmpty(p))
+            .ToList();
+
+        var sourceTree = CSharpSyntaxTree.ParseText(testSource);
+
+        // Create compilation that includes the generated source
+        CSharpCompilation genCompilation = CSharpCompilation.Create(
+            assemblyName: "TestAssembly" + "_Generated",
+            syntaxTrees: [ sourceTree, genTree ],
+            references: references,
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+                .WithOptimizationLevel(OptimizationLevel.Release)
+                .WithNullableContextOptions(NullableContextOptions.Enable)
+        );
+
+        using var ms = new MemoryStream();
+        EmitResult emit = genCompilation.Emit(ms);
+
+        var diagnostics = emit.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error || d.Severity == DiagnosticSeverity.Warning).ToImmutableArray();
+
+        if (!emit.Success)
+        {
+            return new GeneratedCompilationResult(false, referencePaths, diagnostics, null);
+        }
+
+        try
+        {
+            ms.Seek(0, SeekOrigin.Begin);
+            Assembly loaded = Assembly.Load(ms.ToArray());
+            return new GeneratedCompilationResult(true, referencePaths, diagnostics, loaded);
+        }
+        catch (Exception ex)
+        {
+            return new GeneratedCompilationResult(true, referencePaths, diagnostics, null, ex);
+        }
     }
 }

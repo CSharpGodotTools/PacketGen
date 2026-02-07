@@ -27,9 +27,6 @@ internal static class MainProjectSource
         """;
 
     public static string PacketStubs => """
-        public struct Vector2 { }
-        public struct Vector3 { }
-
         public abstract class GamePacket
         {
             public virtual void Write(PacketWriter writer) { }
