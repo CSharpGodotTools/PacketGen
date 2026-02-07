@@ -6,9 +6,17 @@ namespace PacketGen.Tests;
 
 internal static class MainProjectSource
 {
-    public static string NetExcludeAttribute => "public sealed class NetExcludeAttribute : System.Attribute {}";
+    private const string NetcodeNamespace = "Framework.Netcode";
 
-    public static string PacketRegistryAttribute => """
+    public static string NetExcludeAttribute => $$"""
+        namespace {{NetcodeNamespace}};
+
+        public sealed class NetExcludeAttribute : System.Attribute {}
+        """;
+
+    public static string PacketRegistryAttribute => $$"""
+        namespace {{NetcodeNamespace}};
+
         [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
         public sealed class PacketRegistryAttribute : System.Attribute
         {
@@ -26,8 +34,10 @@ internal static class MainProjectSource
         }
         """;
 
-    public static string PacketStubs => """
+    public static string PacketStubs => $$"""
         using System;
+
+        namespace {{NetcodeNamespace}};
 
         public abstract class GamePacket
         {

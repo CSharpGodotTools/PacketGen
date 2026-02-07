@@ -24,6 +24,8 @@ internal class GeneratorTest<TGenerator>(string testSource, string generatedFile
         typeof(Godot.Vector3).Assembly.Location
     ];
 
+    private readonly List<string> _sources = [testSource];
+
     static GeneratorTest()
     {
         // Delete all old generated files before tests start again
@@ -45,6 +47,11 @@ internal class GeneratorTest<TGenerator>(string testSource, string generatedFile
         _references.Add(type.Assembly.Location);
     }
 
+    public void AddSource(string source)
+    {
+        _sources.Add(source);
+    }
+
     /// <summary>
     /// Generates source code using the configured source generator and returns the contents of the specified generated
     /// file.
@@ -55,11 +62,11 @@ internal class GeneratorTest<TGenerator>(string testSource, string generatedFile
     /// <returns>Returns null if the source file did not generate anything.</returns>
     public GeneratorTestResult? Start()
     {
-        SyntaxTree testTree = CSharpSyntaxTree.ParseText(testSource);
+        IEnumerable<SyntaxTree> syntaxTrees = _sources.Select(s => CSharpSyntaxTree.ParseText(s));
 
         CSharpCompilation compilation = CSharpCompilation.Create(
             assemblyName: "TestAssembly",
-            syntaxTrees: [testTree],
+            syntaxTrees: syntaxTrees,
             references: _references.Select(r => MetadataReference.CreateFromFile(r)),
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
         );
@@ -177,7 +184,6 @@ public class GeneratorTestResult(string generatedSource, string generatedFile, H
             syntaxTrees: [ sourceTree, genTree, vec2, packetStubs],
             references: references,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                .WithOptimizationLevel(OptimizationLevel.Release)
         );
 
         using var ms = new MemoryStream();
