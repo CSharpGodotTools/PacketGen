@@ -27,6 +27,8 @@ internal static class MainProjectSource
         """;
 
     public static string PacketStubs => """
+        using System;
+
         public abstract class GamePacket
         {
             public virtual void Write(PacketWriter writer) { }
@@ -58,8 +60,8 @@ internal static class MainProjectSource
             public ulong   ReadULong()          => 0UL;
             public byte[]  ReadBytes(int count) => new byte[count];
             public byte[]  ReadBytes()          => ReadBytes(ReadInt());
-            public Vector2 ReadVector2()        => new Vector2(0f,0f);
-            public Vector3 ReadVector3()        => new Vector3(0f,0f,0f);
+            public Godot.Vector2 ReadVector2()        => new Godot.Vector2(0f,0f);
+            public Godot.Vector3 ReadVector3()        => new Godot.Vector3(0f,0f,0f);
 
             public T Read<T>() => default!;
 

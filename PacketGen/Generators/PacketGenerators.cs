@@ -51,7 +51,7 @@ internal class PacketGenerators
             GenerateWrite(new GenerateWriteContext(compilation, property, property.Type, writeLines), property.Name, "");
             GenerateRead(new GenerateReadContext(property, property.Type, property.Name, readLines, namespaces), "");
             GenerateEquals(equalsLines, property);
-            GenerateHash(hashLines, property);
+            GenerateHash(hashLines, property, namespaces);
         }
 
         string usings = string.Join("\n", namespaces.Select(ns => $"using {ns};"));
@@ -330,8 +330,10 @@ public partial class {{className}}
         equalsLines.Add(line);
     }
 
-    private static void GenerateHash(List<string> hashLines, IPropertySymbol property)
+    private static void GenerateHash(List<string> hashLines, IPropertySymbol property, HashSet<string> namespaces)
     {
+        namespaces.Add("System");
+
         string line = $"hashCode.Add({property.Name});";
 
         hashLines.Add(line);

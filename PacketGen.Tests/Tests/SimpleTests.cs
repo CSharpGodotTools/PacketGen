@@ -31,8 +31,6 @@ internal class SimpleTests
         string testCode = $$"""
         namespace TestPackets;
 
-        {{MainProjectSource.PacketStubs}}
-
         // Test Code
         public partial class {{className}} : ClientPacket
         {

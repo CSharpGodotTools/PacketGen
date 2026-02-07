@@ -139,14 +139,45 @@ public class GeneratorTestResult(string generatedSource, string generatedFile, H
 
         var sourceTree = CSharpSyntaxTree.ParseText(testSource);
 
+        SyntaxTree vec2 = CSharpSyntaxTree.ParseText("""
+        namespace Godot;
+
+        public struct Vector2
+        {
+            public float X;
+            public float Y;
+
+            public Vector2(float x, float y)
+            {
+                X = x;
+                Y = y;
+            }
+        }
+
+        public struct Vector3
+        {
+            public float X;
+            public float Y;
+            public float Z;
+
+            public Vector3(float x, float y, float z)
+            {
+                X = x;
+                Y = y;
+                Z = z;
+            }
+        }
+        """);
+
+        SyntaxTree packetStubs = CSharpSyntaxTree.ParseText(MainProjectSource.PacketStubs);
+
         // Create compilation that includes the generated source
         CSharpCompilation genCompilation = CSharpCompilation.Create(
             assemblyName: "TestAssembly" + "_Generated",
-            syntaxTrees: [ sourceTree, genTree ],
+            syntaxTrees: [ sourceTree, genTree, vec2, packetStubs],
             references: references,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
                 .WithOptimizationLevel(OptimizationLevel.Release)
-                .WithNullableContextOptions(NullableContextOptions.Enable)
         );
 
         using var ms = new MemoryStream();
