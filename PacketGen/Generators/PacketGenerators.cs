@@ -45,12 +45,12 @@ internal class PacketGenerators
 
         foreach (IPropertySymbol property in properties)
         {
-            GenerateWrite(compilation, property, property.Type, property.Name, writeLines, "");
+            GenerateWrite(new GenerateWriteContext(compilation, property, property.Type, writeLines), property.Name, "");
         }
 
         foreach (IPropertySymbol property in properties)
         {
-            GenerateRead(property, property.Type, property.Name, readLines, namespaces, "");
+            GenerateRead(new GenerateReadContext(property, property.Type, property.Name, readLines, namespaces), "");
         }
 
         string usings = string.Join("\n", namespaces.Select(ns => $"using {ns};"));
@@ -77,28 +77,24 @@ public partial class {{className}}
         return sourceCode;
     }
 
-    private static void GenerateWrite(
-        Compilation compilation,
-        IPropertySymbol property,
-        ITypeSymbol type,
+    private static void GenerateWrite(GenerateWriteContext ctx,
         string valueExpression,
-        List<string> writeLines,
         string indent,
         int depth = 0)
     {
-        string? suffix = ReadMethodSuffix.Get(type);
+        string? suffix = ReadMethodSuffix.Get(ctx.Type);
 
         // Primitive
         if (suffix != null)
         {
-            writeLines.Add($"{indent}writer.Write({valueExpression});");
+            ctx.WriteLines.Add($"{indent}writer.Write({valueExpression});");
             return;
         }
 
         // INamedTypeSymbol gives access to properties we need to check
         // - IsGenericType: e.g. List<T> or Dictionary<TKey, TValue>
         // - IsUnboundGenericType: e.g. List<int> 
-        if (type is not INamedTypeSymbol namedType || !namedType.IsGenericType)
+        if (ctx.Type is not INamedTypeSymbol namedType || !namedType.IsGenericType)
             return;
 
         // List<T>
@@ -111,36 +107,29 @@ public partial class {{className}}
             string elementAccess = $"{valueExpression}[{loopIndex}]";
 
             if (depth == 0)
-                writeLines.Add($"{indent}#region {valueExpression}");
+                ctx.WriteLines.Add($"{indent}#region {valueExpression}");
 
-            writeLines.Add($"{indent}writer.Write({countVar});");
-            writeLines.Add("");
+            ctx.WriteLines.Add($"{indent}writer.Write({countVar});");
+            ctx.WriteLines.Add("");
 
-            writeLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
-            writeLines.Add($"{indent}{{");
+            ctx.WriteLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
+            ctx.WriteLines.Add($"{indent}{{");
 
             string? elementSuffix = ReadMethodSuffix.Get(elementType);
 
             if (elementSuffix != null)
             {
-                writeLines.Add($"{indent}    writer.Write({elementAccess});");
+                ctx.WriteLines.Add($"{indent}    writer.Write({elementAccess});");
             }
             else
             {
-                GenerateWrite(
-                    compilation,
-                    property,
-                    elementType,
-                    elementAccess,
-                    writeLines,
-                    indent + "    ",
-                    depth + 1);
+                GenerateWrite(ctx, valueExpression, indent + "    ", depth + 1);
             }
 
-            writeLines.Add($"{indent}}}");
+            ctx.WriteLines.Add($"{indent}}}");
 
             if (depth == 0)
-                writeLines.Add($"{indent}#endregion");
+                ctx.WriteLines.Add($"{indent}#endregion");
 
             return;
         }
@@ -154,72 +143,53 @@ public partial class {{className}}
             string kvVar = $"kv{depth}";
 
             if (depth == 0)
-                writeLines.Add($"{indent}#region {valueExpression}");
+                ctx.WriteLines.Add($"{indent}#region {valueExpression}");
 
-            writeLines.Add($"{indent}// {valueExpression}");
-            writeLines.Add($"{indent}writer.Write({valueExpression}.Count);");
-            writeLines.Add("");
+            ctx.WriteLines.Add($"{indent}// {valueExpression}");
+            ctx.WriteLines.Add($"{indent}writer.Write({valueExpression}.Count);");
+            ctx.WriteLines.Add("");
 
-            writeLines.Add($"{indent}foreach (var {kvVar} in {valueExpression})");
-            writeLines.Add($"{indent}{{");
+            ctx.WriteLines.Add($"{indent}foreach (var {kvVar} in {valueExpression})");
+            ctx.WriteLines.Add($"{indent}{{");
 
-            GenerateWrite(
-                compilation,
-                property,
-                keyType,
-                $"{kvVar}.Key",
-                writeLines,
-                indent + "    ",
-                depth + 1);
+            GenerateWrite(ctx, $"{kvVar}.Key", indent + "    ", depth + 1);
 
-            writeLines.Add("");
+            ctx.WriteLines.Add("");
 
-            GenerateWrite(
-                compilation,
-                property,
-                valueType,
-                $"{kvVar}.Value",
-                writeLines,
-                indent + "    ",
-                depth + 1);
+            GenerateWrite(ctx, $"{kvVar}.Value", indent + "    ", depth + 1);
 
-            writeLines.Add($"{indent}}}");
+            ctx.WriteLines.Add($"{indent}}}");
 
             if (depth == 0)
-                writeLines.Add($"{indent}#endregion");
+                ctx.WriteLines.Add($"{indent}#endregion");
 
             return;
         }
     }
 
-    private static void GenerateRead(
-        IPropertySymbol property,
-        ITypeSymbol type,
-        string targetExpression,
-        List<string> readLines,
-        HashSet<string> namespaces,
+    private static void GenerateRead(GenerateReadContext ctx,
         string indent,
         int depth = 0,
         string? rootName = null)
     {
-        rootName ??= targetExpression;
+        rootName ??= ctx.TargetExpression;
 
-        string? suffix = ReadMethodSuffix.Get(type);
+        string? suffix = ReadMethodSuffix.Get(ctx.Type);
 
         // Primitive
         if (suffix != null)
         {
-            readLines.Add($"{indent}{targetExpression} = reader.Read{suffix}();");
+            ctx.ReadLines.Add($"{indent}{ctx.TargetExpression} = reader.Read{suffix}();");
             return;
         }
 
-        if (type is not INamedTypeSymbol namedType || !namedType.IsGenericType)
+        if (ctx.Type is not INamedTypeSymbol namedType || !namedType.IsGenericType)
             return;
 
         // List<T>
         if (namedType.Name == "List")
         {
-            namespaces.Add("System.Collections.Generic");
+            ctx.Namespaces.Add("System.Collections.Generic");
 
             ITypeSymbol elementType = namedType.TypeArguments[0];
 
@@ -234,49 +204,41 @@ public partial class {{className}}
             string elementVar = $"element{depth}";
 
             if (depth == 0)
-                readLines.Add($"{indent}#region {targetExpression}");
+                ctx.ReadLines.Add($"{indent}#region {ctx.TargetExpression}");
 
             // Create the list
-            readLines.Add($"{indent}{targetExpression} = new List<{elementTypeName}>();");
+            ctx.ReadLines.Add($"{indent}{ctx.TargetExpression} = new List<{elementTypeName}>();");
 
             // Keep track of the list count
-            readLines.Add($"{indent}int {countVar} = reader.ReadInt();");
-            readLines.Add("");
+            ctx.ReadLines.Add($"{indent}int {countVar} = reader.ReadInt();");
+            ctx.ReadLines.Add("");
 
             // Loop
-            readLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
-            readLines.Add($"{indent}{{");
+            ctx.ReadLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
+            ctx.ReadLines.Add($"{indent}{{");
 
             string? elementSuffix = ReadMethodSuffix.Get(elementType);
 
             if (elementSuffix != null)
             {
                 // Primitive type
-                readLines.Add($"{indent}    {targetExpression}.Add(reader.Read{elementSuffix}());");
+                ctx.ReadLines.Add($"{indent}    {ctx.TargetExpression}.Add(reader.Read{elementSuffix}());");
             }
             else
             {
                 // Generic type
-                readLines.Add($"{indent}    {elementTypeName} {elementVar} = new {elementTypeName}();");
+                ctx.ReadLines.Add($"{indent}    {elementTypeName} {elementVar} = new {elementTypeName}();");
 
-                GenerateRead(
-                    property,
-                    elementType,
-                    elementVar,
-                    readLines,
-                    namespaces,
-                    indent + "    ",
-                    depth + 1,
-                    rootName);
+                GenerateRead(ctx, indent + "    ", depth + 1, rootName);
 
-                readLines.Add("");
-                readLines.Add($"{indent}    {targetExpression}.Add({elementVar});");
+                ctx.ReadLines.Add("");
+                ctx.ReadLines.Add($"{indent}    {ctx.TargetExpression}.Add({elementVar});");
             }
 
-            readLines.Add($"{indent}}}");
+            ctx.ReadLines.Add($"{indent}}}");
 
             if (depth == 0)
-                readLines.Add($"{indent}#endregion");
+                ctx.ReadLines.Add($"{indent}#endregion");
 
             return;
         }
@@ -284,7 +246,7 @@ public partial class {{className}}
         // Dictionary<TKey, TValue>
         if (namedType.Name == "Dictionary")
         {
-            namespaces.Add("System.Collections.Generic");
+            ctx.Namespaces.Add("System.Collections.Generic");
 
             ITypeSymbol keyType = namedType.TypeArguments[0];
             ITypeSymbol valueType = namedType.TypeArguments[1];
@@ -303,57 +265,67 @@ public partial class {{className}}
             string valueVar = $"value{depth}";
 
             if (depth == 0)
-                readLines.Add($"{indent}#region {targetExpression}");
+                ctx.ReadLines.Add($"{indent}#region {ctx.TargetExpression}");
 
             // Create the dictionary
-            readLines.Add($"{indent}{targetExpression} = new Dictionary<{keyTypeName}, {valueTypeName}>();");
+            ctx.ReadLines.Add($"{indent}{ctx.TargetExpression} = new Dictionary<{keyTypeName}, {valueTypeName}>();");
 
             // Keep track of the dictionary count (assume int is preferred)
-            readLines.Add($"{indent}int {countVar} = reader.ReadInt();");
-            readLines.Add("");
+            ctx.ReadLines.Add($"{indent}int {countVar} = reader.ReadInt();");
+            ctx.ReadLines.Add("");
 
             // Loop
-            readLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
-            readLines.Add($"{indent}{{");
-            readLines.Add($"{indent}    {keyTypeName} {keyVar};"); // e.g. string key0;
-            readLines.Add($"{indent}    {valueTypeName} {valueVar};"); // e.g. int value0;
-            readLines.Add("");
+            ctx.ReadLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
+            ctx.ReadLines.Add($"{indent}{{");
+            ctx.ReadLines.Add($"{indent}    {keyTypeName} {keyVar};"); // e.g. string key0;
+            ctx.ReadLines.Add($"{indent}    {valueTypeName} {valueVar};"); // e.g. int value0;
+            ctx.ReadLines.Add("");
 
             // Read key0
-            GenerateRead(
-                property,
-                keyType,
-                keyVar,
-                readLines,
-                namespaces,
-                indent + "    ",
-                depth + 1,
-                rootName);
+            GenerateRead(ctx, indent + "    ", depth + 1, rootName);
 
-            readLines.Add("");
+            ctx.ReadLines.Add("");
 
             // Read value0
-            GenerateRead(
-                property,
-                valueType,
-                valueVar,
-                readLines,
-                namespaces,
-                indent + "    ",
-                depth + 1,
-                rootName);
+            GenerateRead(ctx, indent + "    ", depth + 1, rootName);
 
-            readLines.Add("");
+            ctx.ReadLines.Add("");
             // Add the key0 and value0 to the dictionary
-            readLines.Add($"{indent}    {targetExpression}.Add({keyVar}, {valueVar});");
-            readLines.Add($"{indent}}}");
+            ctx.ReadLines.Add($"{indent}    {ctx.TargetExpression}.Add({keyVar}, {valueVar});");
+            ctx.ReadLines.Add($"{indent}}}");
 
             if (depth == 0)
-                readLines.Add($"{indent}#endregion");
+                ctx.ReadLines.Add($"{indent}#endregion");
 
             return;
         }
 
-        Logger.Info(property, $"Type {type.ToDisplayString()} is not supported. Implement Write and Read manually.");
+        Logger.Info(ctx.Property, $"Type {ctx.Type.ToDisplayString()} is not supported. Implement Write and Read manually.");
+    }
+
+    private sealed class GenerateWriteContext(
+        Compilation compilation,
+        IPropertySymbol property,
+        ITypeSymbol type,
+        List<string> writeLines)
+    {
+        public Compilation Compilation { get; } = compilation;
+        public IPropertySymbol Property { get; } = property;
+        public ITypeSymbol Type { get; } = type;
+        public List<string> WriteLines { get; } = writeLines;
+    }
+
+    private sealed class GenerateReadContext(
+        IPropertySymbol property,
+        ITypeSymbol type,
+        string targetExpression,
+        List<string> readLines,
+        HashSet<string> namespaces)
+    {
+        public IPropertySymbol Property { get; } = property;
+        public ITypeSymbol Type { get; } = type;
+        public string TargetExpression { get; } = targetExpression;
+        public List<string> ReadLines { get; } = readLines;
+        public HashSet<string> Namespaces { get; } = namespaces;
     }
 }
