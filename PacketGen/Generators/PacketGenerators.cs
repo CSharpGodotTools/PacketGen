@@ -1,5 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
 using PacketGen.Utilities;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -39,22 +40,23 @@ internal class PacketGenerators
         string namespaceName = symbol.ContainingNamespace.ToDisplayString();
         string className = symbol.Name;
 
+        HashSet<string> namespaces = [];
         List<string> writeLines = [];
         List<string> readLines = [];
-        HashSet<string> namespaces = [];
+        List<string> equalsLines = [];
+        List<string> hashLines = [];
 
         foreach (IPropertySymbol property in properties)
         {
             GenerateWrite(new GenerateWriteContext(compilation, property, property.Type, writeLines), property.Name, "");
-        }
-
-        foreach (IPropertySymbol property in properties)
-        {
             GenerateRead(new GenerateReadContext(property, property.Type, property.Name, readLines, namespaces), "");
+            GenerateEquals(equalsLines, property);
+            GenerateHash(hashLines, property);
         }
 
         string usings = string.Join("\n", namespaces.Select(ns => $"using {ns};"));
         string indent8 = "        ";
+        string indent12 = "            ";
         string sourceCode = $$"""
 {{usings}}
 namespace {{namespaceName}};
@@ -69,6 +71,24 @@ public partial class {{className}}
     public override void Read(PacketReader reader)
     {
 {{string.Join("\n", readLines.Select(line => indent8 + line))}}
+    }
+
+    public override bool Equals(object obj)
+    {
+        if (obj == null || obj is not {{className}} other)
+            return false;
+
+        return 
+{{string.Join("\n", equalsLines.Select((line, i) => indent12 + line + (i == equalsLines.Count - 1 ? ";" : " &&")))}}
+    }
+
+    public override int GetHashCode()
+    {
+        HashCode hashCode = new();
+
+{{string.Join("\n", hashLines.Select(line => indent8 + line))}}
+
+        return hashCode.ToHashCode();
     }
 }
 
@@ -301,6 +321,20 @@ public partial class {{className}}
         }
 
         Logger.Info(ctx.Property, $"Type {ctx.Type.ToDisplayString()} is not supported. Implement Write and Read manually.");
+    }
+
+    private static void GenerateEquals(List<string> equalsLines, IPropertySymbol property)
+    {
+        string line = $"{property.Name}.Equals(other.{property.Name})";
+
+        equalsLines.Add(line);
+    }
+
+    private static void GenerateHash(List<string> hashLines, IPropertySymbol property)
+    {
+        string line = $"hashCode.Add({property.Name});";
+
+        hashLines.Add(line);
     }
 
     private sealed class GenerateWriteContext(
