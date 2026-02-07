@@ -2,6 +2,7 @@
 using PacketGen.Utilities;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 
@@ -14,11 +15,11 @@ internal class PacketGenerators
         List<IPropertySymbol> properties = [];
         bool hasWriteReadMethods = false;
 
-        foreach (var member in symbol.GetMembers())
+        foreach (ISymbol member in symbol.GetMembers())
         {
             if (member is IPropertySymbol property)
             {
-                var attributes = property.GetAttributes();
+                ImmutableArray<AttributeData> attributes = property.GetAttributes();
 
                 // Ignore properties with the [NetExclude] attribute
                 if (attributes.Any(attr => attr.AttributeClass?.Name == "NetExcludeAttribute"))
@@ -37,12 +38,12 @@ internal class PacketGenerators
         if (hasWriteReadMethods || properties.Count == 0)
             return null;
 
-        var namespaceName = symbol.ContainingNamespace.ToDisplayString();
-        var className = symbol.Name;
+        string namespaceName = symbol.ContainingNamespace.ToDisplayString();
+        string className = symbol.Name;
 
-        var writeLines = new List<string>();
-        var readLines = new List<string>();
-        var namespaces = new HashSet<string>();
+        List<string> writeLines = [];
+        List<string> readLines = [];
+        HashSet<string> namespaces = [];
 
         foreach (IPropertySymbol property in properties)
         {
@@ -54,9 +55,9 @@ internal class PacketGenerators
             GenerateRead(property, property.Type, property.Name, readLines, namespaces, "");
         }
 
-        var usings = string.Join("\n", namespaces.Select(ns => $"using {ns};"));
-        var indent8 = "        ";
-        var sourceCode = $$"""
+        string usings = string.Join("\n", namespaces.Select(ns => $"using {ns};"));
+        string indent8 = "        ";
+        string sourceCode = $$"""
 {{usings}}
 namespace {{namespaceName}};
 
@@ -70,7 +71,7 @@ public partial class {{className}}
     public override void Read(PacketReader reader)
     {
 {{string.Join("\n", readLines.Select(line => indent8 + line))}}
-    }
+    }s
 }
 
 """;

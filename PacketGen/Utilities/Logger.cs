@@ -35,7 +35,7 @@ internal static class Logger
 
     private static void Log(ISymbol? symbol, string? message, DiagnosticSeverity severity)
     {
-        var descriptor = new DiagnosticDescriptor(
+        DiagnosticDescriptor descriptor = new(
             "MY0001",
             "Info",
             message ?? "null",
@@ -51,7 +51,7 @@ internal static class Logger
             location = symbol.Locations.FirstOrDefault() ?? Location.None;
         }
 
-        var diagnostic = Diagnostic.Create(descriptor, location);
+        Diagnostic diagnostic = Diagnostic.Create(descriptor, location);
         _context.ReportDiagnostic(diagnostic);
     }
 }

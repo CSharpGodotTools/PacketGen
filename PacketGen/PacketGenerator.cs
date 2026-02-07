@@ -14,8 +14,8 @@ public sealed class PacketGenerator : IIncrementalGenerator
     {
         IncrementalValuesProvider<INamedTypeSymbol> packetSymbols = GetPacketSymbols(context);
 
-        var clientPackets = packetSymbols.Where(static s => s.BaseType!.Name == "ClientPacket");
-        var serverPackets = packetSymbols.Where(static s => s.BaseType!.Name == "ServerPacket");
+        IncrementalValuesProvider<INamedTypeSymbol> clientPackets = packetSymbols.Where(static s => s.BaseType!.Name == "ClientPacket");
+        IncrementalValuesProvider<INamedTypeSymbol> serverPackets = packetSymbols.Where(static s => s.BaseType!.Name == "ServerPacket");
 
         var compilation = context.CompilationProvider;
 
