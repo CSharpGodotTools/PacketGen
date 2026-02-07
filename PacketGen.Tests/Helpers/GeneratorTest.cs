@@ -151,29 +151,14 @@ public class GeneratorTestResult(string generatedSource, string generatedFile, H
 
     public void CompileGeneratedAssembly(string generatedSource)
     {
-        // Create syntax tree(s) for generated source
         SyntaxTree genTree = CSharpSyntaxTree.ParseText(generatedSource);
 
-        // Combine test tree and generated tree into a new compilation
-        List<PortableExecutableReference> references = _references.Select(r => MetadataReference.CreateFromFile(r)).ToList();
-
-        // Add common references usually needed by generated code
-        references.Add(MetadataReference.CreateFromFile(typeof(object).Assembly.Location));
-        references.Add(MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location));
-
-        AddTrustedPlatformReference(references, "System.Runtime.dll");
-        AddTrustedPlatformReference(references, "System.Collections.dll");
-
-        List<string> referencePaths = [.. references
-            .OfType<PortableExecutableReference>()
-            .Select(r => r.FilePath ?? string.Empty)
-            .Where(p => !string.IsNullOrEmpty(p))];
+        List<PortableExecutableReference> references = [.. _references.Select(r => MetadataReference.CreateFromFile(r))];
 
         SyntaxTree sourceTree = CSharpSyntaxTree.ParseText(testSource);
 
         SyntaxTree packetStubs = CSharpSyntaxTree.ParseText(MainProjectSource.PacketStubs);
 
-        // Create compilation that includes the generated source
         CSharpCompilation genCompilation = CSharpCompilation.Create(
             assemblyName: "TestAssembly" + "_Generated",
             syntaxTrees: [sourceTree, genTree, packetStubs],
@@ -192,9 +177,9 @@ public class GeneratorTestResult(string generatedSource, string generatedFile, H
 
             sb.AppendLine("========= Errors =========\n");
 
-            int sevWidth = 8;    // e.g. "Warning"
-            int idWidth = 7;     // e.g. "CS0123"
-            int locWidth = 18;   // adjust for typical file/line span
+            int sevWidth = 8;  // e.g. "Warning"
+            int idWidth = 7;   // e.g. "CS0123"
+            int locWidth = 18;
 
             static string Pad(string s, int w) => s.Length >= w ? s : s + new string(' ', w - s.Length);
 
@@ -215,6 +200,11 @@ public class GeneratorTestResult(string generatedSource, string generatedFile, H
             sb.AppendLine();
             sb.AppendLine("========= References =========\n");
 
+            List<string> referencePaths = [.. references
+                .OfType<PortableExecutableReference>()
+                .Select(r => r.FilePath ?? string.Empty)
+                .Where(p => !string.IsNullOrEmpty(p))];
+
             foreach (string @ref in referencePaths)
             {
                 sb.AppendLine(@ref);
@@ -231,16 +221,5 @@ public class GeneratorTestResult(string generatedSource, string generatedFile, H
 
         ms.Seek(0, SeekOrigin.Begin);
         Assembly loaded = Assembly.Load(ms.ToArray());
-    }
-
-    private static void AddTrustedPlatformReference(List<PortableExecutableReference> references, string assemblyFileName)
-    {
-        string? trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
-        string? assemblyPath = trustedPlatformAssemblies?
-            .Split(Path.PathSeparator)
-            .FirstOrDefault(p => string.Equals(Path.GetFileName(p), assemblyFileName, StringComparison.OrdinalIgnoreCase));
-
-        if (!string.IsNullOrWhiteSpace(assemblyPath))
-            references.Add(MetadataReference.CreateFromFile(assemblyPath));
     }
 }
