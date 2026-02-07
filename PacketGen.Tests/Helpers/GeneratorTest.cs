@@ -28,6 +28,8 @@ internal class GeneratorTest<TGenerator>(string testSource, string generatedFile
 
     private readonly List<string> _sources = [testSource];
 
+    private static readonly Dictionary<string, string> _trustedPlatformAssemblyLookup = BuildTrustedPlatformAssemblyLookup();
+
     static GeneratorTest()
     {
         // Delete all old generated files before tests start again
@@ -64,6 +66,9 @@ internal class GeneratorTest<TGenerator>(string testSource, string generatedFile
     /// <returns>Returns null if the source file did not generate anything.</returns>
     public GeneratorTestResult? Start()
     {
+        AddTrustedPlatformReference("System.Runtime.dll");
+        AddTrustedPlatformReference("System.Collections.dll");
+
         IEnumerable<SyntaxTree> syntaxTrees = _sources.Select(s => CSharpSyntaxTree.ParseText(s));
 
         CSharpCompilation compilation = CSharpCompilation.Create(
@@ -97,6 +102,25 @@ internal class GeneratorTest<TGenerator>(string testSource, string generatedFile
         GeneratedFiles.Output(generatedFile, generatedSource);
 
         return new GeneratorTestResult(generatedSource, generatedFile, _references, testSource);
+    }
+
+    private void AddTrustedPlatformReference(string assemblyFileName)
+    {
+        if (_trustedPlatformAssemblyLookup.TryGetValue(assemblyFileName, out string? assemblyPath))
+            _references.Add(assemblyPath);
+    }
+
+    private static Dictionary<string, string> BuildTrustedPlatformAssemblyLookup()
+    {
+        string? tpa = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
+
+        if (string.IsNullOrWhiteSpace(tpa))
+            return [];
+
+        return tpa.Split(Path.PathSeparator)
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .GroupBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key!, group => group.First(), StringComparer.OrdinalIgnoreCase);
     }
 }
 
@@ -137,8 +161,8 @@ public class GeneratorTestResult(string generatedSource, string generatedFile, H
         references.Add(MetadataReference.CreateFromFile(typeof(object).Assembly.Location));
         references.Add(MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location));
 
-        if (TryGetRuntimeAssembly(out string runtimePath))
-            references.Add(MetadataReference.CreateFromFile(runtimePath));
+        AddTrustedPlatformReference(references, "System.Runtime.dll");
+        AddTrustedPlatformReference(references, "System.Collections.dll");
 
         List<string> referencePaths = [.. references
             .OfType<PortableExecutableReference>()
@@ -209,20 +233,14 @@ public class GeneratorTestResult(string generatedSource, string generatedFile, H
         Assembly loaded = Assembly.Load(ms.ToArray());
     }
 
-    private static bool TryGetRuntimeAssembly(out string runtimePath)
+    private static void AddTrustedPlatformReference(List<PortableExecutableReference> references, string assemblyFileName)
     {
         string? trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
-        string? systemRuntimePath = trustedPlatformAssemblies?
+        string? assemblyPath = trustedPlatformAssemblies?
             .Split(Path.PathSeparator)
-            .FirstOrDefault(p => string.Equals(Path.GetFileName(p), "System.Runtime.dll", StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(p => string.Equals(Path.GetFileName(p), assemblyFileName, StringComparison.OrdinalIgnoreCase));
 
-        if (!string.IsNullOrWhiteSpace(systemRuntimePath))
-        {
-            runtimePath = systemRuntimePath;
-            return true;
-        }
-
-        runtimePath = null!;
-        return false;
+        if (!string.IsNullOrWhiteSpace(assemblyPath))
+            references.Add(MetadataReference.CreateFromFile(assemblyPath));
     }
 }
