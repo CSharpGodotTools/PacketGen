@@ -1,8 +1,10 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using Godot;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using System.Collections.Immutable;
 using System.Reflection;
+using System.Text;
 
 namespace PacketGen.Tests;
 
@@ -123,36 +125,27 @@ public class GeneratorTestResult(string generatedSource, string generatedFile, H
         return this;
     }
 
-    public record GeneratedCompilationResult(bool Success, IEnumerable<string> ReferencePaths, ImmutableArray<Diagnostic> Diagnostics, Assembly? Assembly, Exception? AssemblyException = null);
-
-    public GeneratedCompilationResult CompileGeneratedAssembly(string generatedSource)
+    public void CompileGeneratedAssembly(string generatedSource)
     {
         // Create syntax tree(s) for generated source
         SyntaxTree genTree = CSharpSyntaxTree.ParseText(generatedSource);
 
         // Combine test tree and generated tree into a new compilation
-        var references = _references.Select(r => MetadataReference.CreateFromFile(r)).ToList();
+        List<PortableExecutableReference> references = _references.Select(r => MetadataReference.CreateFromFile(r)).ToList();
 
         // Add common references usually needed by generated code
         references.Add(MetadataReference.CreateFromFile(typeof(object).Assembly.Location));
         references.Add(MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location));
 
-        // Add reference to System.Runtime.dll
-        string? trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
-        string? systemRuntimePath = trustedPlatformAssemblies?
-            .Split(Path.PathSeparator)
-            .FirstOrDefault(p => string.Equals(Path.GetFileName(p), "System.Runtime.dll", StringComparison.OrdinalIgnoreCase));
+        if (TryGetRuntimeAssembly(out string runtimePath))
+            references.Add(MetadataReference.CreateFromFile(runtimePath));
 
-        if (!string.IsNullOrWhiteSpace(systemRuntimePath))
-            references.Add(MetadataReference.CreateFromFile(systemRuntimePath));
-
-        var referencePaths = references
+        List<string> referencePaths = [.. references
             .OfType<PortableExecutableReference>()
             .Select(r => r.FilePath ?? string.Empty)
-            .Where(p => !string.IsNullOrEmpty(p))
-            .ToList();
+            .Where(p => !string.IsNullOrEmpty(p))];
 
-        var sourceTree = CSharpSyntaxTree.ParseText(testSource);
+        SyntaxTree sourceTree = CSharpSyntaxTree.ParseText(testSource);
 
         SyntaxTree packetStubs = CSharpSyntaxTree.ParseText(MainProjectSource.PacketStubs);
 
@@ -164,25 +157,72 @@ public class GeneratorTestResult(string generatedSource, string generatedFile, H
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
         );
 
-        using var ms = new MemoryStream();
+        using MemoryStream ms = new();
         EmitResult emit = genCompilation.Emit(ms);
 
-        var diagnostics = emit.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error || d.Severity == DiagnosticSeverity.Warning).ToImmutableArray();
+        ImmutableArray<Diagnostic> diagnostics = emit.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error || d.Severity == DiagnosticSeverity.Warning).ToImmutableArray();
 
         if (!emit.Success)
         {
-            return new GeneratedCompilationResult(false, referencePaths, diagnostics, null);
+            var sb = new StringBuilder();
+
+            sb.AppendLine("========= Errors =========\n");
+
+            int sevWidth = 8;    // e.g. "Warning"
+            int idWidth = 7;     // e.g. "CS0123"
+            int locWidth = 18;   // adjust for typical file/line span
+
+            static string Pad(string s, int w) => s.Length >= w ? s : s + new string(' ', w - s.Length);
+
+            foreach (Diagnostic d in diagnostics)
+            {
+                string sev = Pad(d.Severity.ToString(), sevWidth);
+                string id = Pad(d.Id, idWidth);
+
+                string loc = d.Location == Location.None
+                    ? Pad("NoLocation", locWidth)
+                    : Pad(d.Location.GetLineSpan().ToString(), locWidth);
+
+                string msg = d.GetMessage().Replace("\r\n", " ").Replace("\n", " ");
+
+                sb.AppendLine($"{sev} {id} {loc} : {msg}");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("========= References =========\n");
+
+            foreach (string @ref in referencePaths)
+            {
+                sb.AppendLine(@ref);
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("========= Generated source =========\n");
+            sb.AppendLine(generatedSource);
+
+            GeneratedFiles.OutputErrors($"{generatedFile}_Errors.txt", sb.ToString());
+
+            Assert.That(false, $"Test assembly failed with errors, see {generatedFile}_Errors.txt");
         }
 
-        try
+        ms.Seek(0, SeekOrigin.Begin);
+        Assembly loaded = Assembly.Load(ms.ToArray());
+    }
+
+    private static bool TryGetRuntimeAssembly(out string runtimePath)
+    {
+        string? trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
+        string? systemRuntimePath = trustedPlatformAssemblies?
+            .Split(Path.PathSeparator)
+            .FirstOrDefault(p => string.Equals(Path.GetFileName(p), "System.Runtime.dll", StringComparison.OrdinalIgnoreCase));
+
+        if (!string.IsNullOrWhiteSpace(systemRuntimePath))
         {
-            ms.Seek(0, SeekOrigin.Begin);
-            Assembly loaded = Assembly.Load(ms.ToArray());
-            return new GeneratedCompilationResult(true, referencePaths, diagnostics, loaded);
+            runtimePath = systemRuntimePath;
+            return true;
         }
-        catch (Exception ex)
-        {
-            return new GeneratedCompilationResult(true, referencePaths, diagnostics, null, ex);
-        }
+
+        runtimePath = null!;
+        return false;
     }
 }

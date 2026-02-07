@@ -36,5 +36,7 @@ internal class PacketRegistryTests
             .GetGeneratedSource(out string source);
 
         Assert.That(source, Does.Contain("ushort"));
+
+        testBuilder.CompileGeneratedAssembly(source);
     }
 }
