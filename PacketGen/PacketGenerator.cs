@@ -1,8 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Linq;
 
 namespace PacketGen;
@@ -12,53 +10,15 @@ public sealed class PacketGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        // Discover packet types
-        var packetSymbols = context.SyntaxProvider.CreateSyntaxProvider(
-                predicate: static (node, _) => node is ClassDeclarationSyntax cds && cds.BaseList is not null,
-                transform: static (ctx, _) =>
-                {
-                    var syntax = (ClassDeclarationSyntax)ctx.Node;
-                    return ctx.SemanticModel.GetDeclaredSymbol(syntax) as INamedTypeSymbol;
-                })
-            .Where(static symbol =>
-                symbol is not null &&
-                symbol.BaseType is not null &&
-                (symbol.BaseType.Name == "ClientPacket" || symbol.BaseType.Name == "ServerPacket"))
-            .Select(static (symbol, _) => symbol!);
+        IncrementalValuesProvider<INamedTypeSymbol> packetSymbols = GetPacketSymbols(context);
+        IncrementalValuesProvider<INamedTypeSymbol> clientPackets = packetSymbols.Where(static s => s.BaseType!.Name == "ClientPacket");
+        IncrementalValuesProvider<INamedTypeSymbol> serverPackets = packetSymbols.Where(static s => s.BaseType!.Name == "ServerPacket");
 
-        var clientPackets = packetSymbols.Where(static s => s.BaseType!.Name == "ClientPacket");
-        var serverPackets = packetSymbols.Where(static s => s.BaseType!.Name == "ServerPacket");
+        IncrementalValueProvider<Compilation> compilation = context.CompilationProvider;
 
-        var compilation = context.CompilationProvider;
-
-        // Per-packet read/write generation
-        context.RegisterSourceOutput(
-            clientPackets.Combine(compilation),
-            static (spc, pair) =>
-            {
-                INamedTypeSymbol symbol = pair.Left;
-                Compilation compilationValue = pair.Right;
-
-                string? source =
-                    PacketReadWriteMethodsGenerator.GetSource(compilationValue, symbol);
-
-                if (source is not null)
-                    spc.AddSource($"{symbol.Name}.g.cs", source);
-            });
-
-        context.RegisterSourceOutput(
-            serverPackets.Combine(compilation),
-            static (spc, pair) =>
-            {
-                INamedTypeSymbol symbol = pair.Left;
-                Compilation compilationValue = pair.Right;
-
-                string? source =
-                    PacketReadWriteMethodsGenerator.GetSource(compilationValue, symbol);
-
-                if (source is not null)
-                    spc.AddSource($"{symbol.Name}.g.cs", source);
-            });
+        // Per-packet script source generation
+        GenerateSourceForPacketScripts(context, clientPackets, compilation);
+        GenerateSourceForPacketScripts(context, serverPackets, compilation);
 
         // Discover [PacketRegistry] attributes
         IncrementalValuesProvider<INamedTypeSymbol> registryClass = FindPacketRegistryAttributes(context);
@@ -71,6 +31,42 @@ public sealed class PacketGenerator : IIncrementalGenerator
         GeneratePacketRegistryClass(context, registryInput);
     }
 
+    private static IncrementalValuesProvider<INamedTypeSymbol> GetPacketSymbols(IncrementalGeneratorInitializationContext context)
+    {
+        return context.SyntaxProvider.CreateSyntaxProvider(
+                predicate: static (node, _) => node is ClassDeclarationSyntax cds && cds.BaseList is not null,
+                transform: static (ctx, _) =>
+                {
+                    var syntax = (ClassDeclarationSyntax)ctx.Node;
+                    return ctx.SemanticModel.GetDeclaredSymbol(syntax) as INamedTypeSymbol;
+                })
+            .Where(static symbol =>
+                symbol is not null &&
+                symbol.BaseType is not null &&
+                (symbol.BaseType.Name == "ClientPacket" || symbol.BaseType.Name == "ServerPacket"))
+            .Select(static (symbol, _) => symbol!);
+    }
+
+    private static void GenerateSourceForPacketScripts(IncrementalGeneratorInitializationContext context, IncrementalValuesProvider<INamedTypeSymbol> clientPackets, IncrementalValueProvider<Compilation> compilation)
+    {
+        context.RegisterSourceOutput(
+            clientPackets.Combine(compilation),
+            static (spc, pair) =>
+            {
+                INamedTypeSymbol symbol = pair.Left;
+                Compilation compilationValue = pair.Right;
+
+                string? source =
+                    PacketGenerators.GetSource(compilationValue, symbol);
+
+                if (source is not null)
+                    spc.AddSource($"{symbol.Name}.g.cs", source);
+            });
+    }
+
+    /// <summary>
+    /// Generates the PacketRegistry.g.cs script.
+    /// </summary>
     private static void GeneratePacketRegistryClass(IncrementalGeneratorInitializationContext context, IncrementalValuesProvider<((INamedTypeSymbol Left, ImmutableArray<INamedTypeSymbol> Right) Left, ImmutableArray<INamedTypeSymbol> Right)> registryInput)
     {
         context.RegisterSourceOutput(registryInput,
@@ -80,10 +76,9 @@ public sealed class PacketGenerator : IIncrementalGenerator
                 ImmutableArray<INamedTypeSymbol> clients = triple.Left.Right;
                 ImmutableArray<INamedTypeSymbol> servers = triple.Right;
 
-                // Resolve ID type from [PacketRegistry<T>]
-                string idTypeName = ResolveRegistryIdType(registrySymbol);
+                string opcodePacketTypeName = GetPacketSizeTypeName(registrySymbol);
 
-                string source = PacketRegistryGenerator.GetSource(registrySymbol, idTypeName,
+                string source = PacketRegistryGenerator.GetSource(registrySymbol, opcodePacketTypeName,
                     [.. clients],
                     [.. servers]);
 
@@ -91,6 +86,9 @@ public sealed class PacketGenerator : IIncrementalGenerator
             });
     }
 
+    /// <summary>
+    /// Finds all [PacketRegistry] attributes in the assembly.
+    /// </summary>
     private static IncrementalValuesProvider<INamedTypeSymbol> FindPacketRegistryAttributes(IncrementalGeneratorInitializationContext context)
     {
         return context.SyntaxProvider.CreateSyntaxProvider(
@@ -98,7 +96,7 @@ public sealed class PacketGenerator : IIncrementalGenerator
                 node is ClassDeclarationSyntax,
             transform: static (ctx, _) =>
             {
-                var syntax = (ClassDeclarationSyntax)ctx.Node;
+                ClassDeclarationSyntax syntax = (ClassDeclarationSyntax)ctx.Node;
 
                 if (ctx.SemanticModel.GetDeclaredSymbol(syntax) is not INamedTypeSymbol symbol)
                     return null;
@@ -115,16 +113,20 @@ public sealed class PacketGenerator : IIncrementalGenerator
             .Select(static (s, _) => s!);
     }
 
-    private static string ResolveRegistryIdType(INamedTypeSymbol registrySymbol)
+    /// <summary>
+    /// Gets the type that defines the packet size from the [PacketRegistry] attribute.
+    /// For example if it's [PacketRegistry(typeof(ushort))] then "ushort" would be returned.
+    /// </summary>
+    private static string GetPacketSizeTypeName(INamedTypeSymbol registrySymbol)
     {
-        foreach (var attribute in registrySymbol.GetAttributes())
+        foreach (AttributeData attribute in registrySymbol.GetAttributes())
         {
             if (attribute.AttributeClass?.Name != "PacketRegistryAttribute")
                 continue;
 
             if (attribute.ConstructorArguments.Length == 1)
             {
-                var arg = attribute.ConstructorArguments[0];
+                TypedConstant arg = attribute.ConstructorArguments[0];
                 if (arg.Kind == TypedConstantKind.Type && arg.Value is ITypeSymbol typeSymbol)
                     return typeSymbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
             }
