@@ -6,7 +6,7 @@ namespace PacketGen.Tests;
 internal class PacketRegistryTests
 {
     [Test]
-    public void PacketRegistry_Exists_And_Contains_Correct_Opcode()
+    public void Correct_Type()
     {
         string testCode = $$"""
         namespace Framework.Netcode;
