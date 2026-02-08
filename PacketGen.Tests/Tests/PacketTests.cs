@@ -1,5 +1,6 @@
 ﻿namespace PacketGen.Tests;
 
+[TestFixture]
 internal class PacketTests
 {
     [Test]
