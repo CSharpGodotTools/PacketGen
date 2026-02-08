@@ -68,7 +68,7 @@ public partial class {{model.ClassName}}
             return false;
 
         return 
-{{string.Join("\n", equalsLines.Select((line, i) => indent12 + line + (i == equalsLines.Count - 1 ? ";" : " &&")))} }
+{{string.Join("\n", equalsLines.Select((line, i) => indent12 + line + (i == equalsLines.Count - 1 ? ";" : " &&")))}}
     }
 
     public override int GetHashCode()
