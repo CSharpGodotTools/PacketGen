@@ -1,11 +1,10 @@
-﻿using System.Reflection;
+﻿namespace PacketGen.Tests;
 
-namespace PacketGen.Tests;
-
+[TestFixture]
 internal class PacketTests
 {
     [Test]
-    public void Simple_Packet_With_NetExclude_Attribute()
+    public void NetExclude_Attribute()
     {
         string testCode = $$"""
         using Godot;
@@ -24,13 +23,18 @@ internal class PacketTests
         }
         """;
 
-        TestAdapter<PacketGenerator> test = new(testCode, "CPacketPlayerPosition.g.cs");
+        GeneratorTestOptions options = new GeneratorTestBuilder<PacketGenerator>(testCode)
+            .WithGeneratedFile("CPacketPlayerPosition.g.cs")
+            .Build();
 
-        TestAdapterBuilder? testBuilder = test.Start();
+        GeneratorTestRunResult? result = GeneratorTestRunner<PacketGenerator>.Run(options);
 
-        Assert.That(testBuilder, Is.Not.Null, "CPacketPlayerPosition.g.cs failed to generate");
-            
-        testBuilder.GetGeneratedSource(out string source);
+        Assert.That(result, Is.Not.Null, "CPacketPlayerPosition.g.cs failed to generate");
+
+        GeneratedFileStore fileStore = new();
+        fileStore.Write(result.GeneratedFile, result.GeneratedSource);
+
+        string source = result.GeneratedSource;
 
         // Check if write read methods exist
         using (Assert.EnterMultipleScope())
@@ -67,5 +71,53 @@ internal class PacketTests
             Assert.That(source, Does.Not.Contain("writer.Write(PrevPosition);"), "[NetExclude] PrevPosition write method exists");
             Assert.That(source, Does.Not.Contain("PrevPosition = reader.ReadVector2();"), "[NetExclude] PrevPosition read method exists");
         }
+    }
+
+    [Test]
+    public void Empty_Packet()
+    {
+        string testCode = $$"""
+        namespace TestPackets;
+
+        public partial class CPacketEmpty : ClientPacket
+        {
+        }
+        """;
+
+        GeneratorTestOptions options = new GeneratorTestBuilder<PacketGenerator>(testCode)
+            .WithGeneratedFile("CPacketEmpty.g.cs")
+            .Build();
+
+        GeneratorTestRunResult? result = GeneratorTestRunner<PacketGenerator>.Run(options);
+
+        Assert.That(result, Is.Null, "A packet with no properties should not trigger the source generator.");
+    }
+
+    [Test]
+    public void Emit_Assembly()
+    {
+        string className = "CSimplePacket";
+        string testCode = $$"""
+        namespace TestPackets;
+
+        // Test Code
+        public partial class {{className}} : ClientPacket
+        {
+            public int Id { get; set; }
+        }
+        """;
+
+        GeneratorTestOptions options = new GeneratorTestBuilder<PacketGenerator>(testCode)
+            .WithGeneratedFile($"{className}.g.cs")
+            .Build();
+
+        GeneratorTestRunResult? result = GeneratorTestRunner<PacketGenerator>.Run(options);
+
+        Assert.That(result, Is.Not.Null, $"{className}.g.cs failed to generate");
+
+        GeneratedFileStore fileStore = new();
+        fileStore.Write(result.GeneratedFile, result.GeneratedSource);
+
+        GeneratedAssemblyCompiler.Compile(result, fileStore);
     }
 }

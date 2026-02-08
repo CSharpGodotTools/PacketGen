@@ -6,7 +6,9 @@ namespace PacketGen.Tests;
 
 internal static class MainProjectSource
 {
-    public static string NetExcludeAttribute => "public sealed class NetExcludeAttribute : System.Attribute {}";
+    public static string NetExcludeAttribute => """
+        public sealed class NetExcludeAttribute : System.Attribute {}
+        """;
 
     public static string PacketRegistryAttribute => """
         [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
@@ -27,8 +29,8 @@ internal static class MainProjectSource
         """;
 
     public static string PacketStubs => """
-        public struct Vector2 { }
-        public struct Vector3 { }
+        using System;
+        using System.Collections.Generic;
 
         public abstract class GamePacket
         {
@@ -41,32 +43,46 @@ internal static class MainProjectSource
         
         public class PacketWriter 
         {
-            public void Write<T>(T v) { }
+            public List<object?> Values { get; } = new();
+
+            public void Write<T>(T v)
+            {
+                Values.Add(v);
+            }
         }
         
         public class PacketReader 
         {
-            public byte    ReadByte()           => 0;
-            public sbyte   ReadSByte()          => 0;
-            public char    ReadChar()           => '\0';
-            public string  ReadString()         => string.Empty;
-            public bool    ReadBool()           => false;
-            public short   ReadShort()          => 0;
-            public ushort  ReadUShort()         => 0;
-            public int     ReadInt()            => 0;
-            public uint    ReadUInt()           => 0;
-            public float   ReadFloat()          => 0f;
-            public double  ReadDouble()         => 0.0;
-            public long    ReadLong()           => 0L;
-            public ulong   ReadULong()          => 0UL;
-            public byte[]  ReadBytes(int count) => new byte[count];
-            public byte[]  ReadBytes()          => ReadBytes(ReadInt());
-            public Vector2 ReadVector2()        => new Vector2(0f,0f);
-            public Vector3 ReadVector3()        => new Vector3(0f,0f,0f);
+            private readonly Queue<object?> _values;
 
-            public T Read<T>() => default!;
+            public PacketReader(IEnumerable<object?> values)
+            {
+                _values = new Queue<object?>(values);
+            }
 
-            public object Read(Type t) => null!;
+            private T ReadValue<T>() => (T)_values.Dequeue()!;
+
+            public byte    ReadByte()           => ReadValue<byte>();
+            public sbyte   ReadSByte()          => ReadValue<sbyte>();
+            public char    ReadChar()           => ReadValue<char>();
+            public string  ReadString()         => ReadValue<string>();
+            public bool    ReadBool()           => ReadValue<bool>();
+            public short   ReadShort()          => ReadValue<short>();
+            public ushort  ReadUShort()         => ReadValue<ushort>();
+            public int     ReadInt()            => ReadValue<int>();
+            public uint    ReadUInt()           => ReadValue<uint>();
+            public float   ReadFloat()          => ReadValue<float>();
+            public double  ReadDouble()         => ReadValue<double>();
+            public long    ReadLong()           => ReadValue<long>();
+            public ulong   ReadULong()          => ReadValue<ulong>();
+            public byte[]  ReadBytes(int count) => ReadValue<byte[]>();
+            public byte[]  ReadBytes()          => ReadValue<byte[]>();
+            public Godot.Vector2 ReadVector2()  => ReadValue<Godot.Vector2>();
+            public Godot.Vector3 ReadVector3()  => ReadValue<Godot.Vector3>();
+
+            public T Read<T>() => ReadValue<T>();
+
+            public object Read(Type t) => _values.Dequeue()!;
         }
         """;
 }

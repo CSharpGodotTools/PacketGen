@@ -29,6 +29,13 @@ internal static class GeneratedFiles
         return dir;
     }
 
+    public static void OutputErrors(string fileName, string contents)
+    {
+        string dir = GetGenDir();
+
+        File.WriteAllText(Path.Combine(dir, fileName), contents);
+    }
+
     private static string GetPath(string fileName)
     {
         string genDir = GetGenDir();

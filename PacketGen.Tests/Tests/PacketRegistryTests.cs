@@ -1,12 +1,10 @@
-﻿using System.Collections;
-using System.Reflection;
+﻿namespace PacketGen.Tests;
 
-namespace PacketGen.Tests;
-
+[TestFixture]
 internal class PacketRegistryTests
 {
     [Test]
-    public void PacketRegistry_Exists_And_Contains_Correct_Opcode()
+    public void Correct_Type()
     {
         string testCode = $$"""
         namespace Framework.Netcode;
@@ -26,15 +24,21 @@ internal class PacketRegistryTests
         }
         """;
 
-        TestAdapter<PacketGenerator> test = new(testCode, "PacketRegistry.g.cs");
+        GeneratorTestOptions options = new GeneratorTestBuilder<PacketGenerator>(testCode)
+            .WithGeneratedFile("PacketRegistry.g.cs")
+            .Build();
 
-        TestAdapterBuilder? testBuilder = test.Start();
+        GeneratorTestRunResult? result = GeneratorTestRunner<PacketGenerator>.Run(options);
 
-        Assert.That(testBuilder, Is.Not.Null, "PacketRegistry.g.cs failed to generate");
+        Assert.That(result, Is.Not.Null, "PacketRegistry.g.cs failed to generate");
 
-        testBuilder
-            .GetGeneratedSource(out string source);
+        GeneratedFileStore fileStore = new();
+        fileStore.Write(result.GeneratedFile, result.GeneratedSource);
+
+        string source = result.GeneratedSource;
 
         Assert.That(source, Does.Contain("ushort"));
+
+        GeneratedAssemblyCompiler.Compile(result, fileStore);
     }
 }
