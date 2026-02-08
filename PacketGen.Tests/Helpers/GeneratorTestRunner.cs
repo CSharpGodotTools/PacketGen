@@ -9,15 +9,15 @@ namespace PacketGen.Tests;
 
 internal sealed class GeneratorTestRunner<TGenerator> where TGenerator : IIncrementalGenerator, new()
 {
-    private static readonly Dictionary<string, string> TrustedPlatformAssemblyLookup = BuildTrustedPlatformAssemblyLookup();
+    private static readonly Dictionary<string, string> _trustedPlatformAssemblyLookup = BuildTrustedPlatformAssemblyLookup();
 
-    public GeneratorTestRunResult? Run(GeneratorTestOptions options)
+    public static GeneratorTestRunResult? Run(GeneratorTestOptions options)
     {
         HashSet<string> references = new(options.References, StringComparer.OrdinalIgnoreCase);
 
         foreach (string assemblyName in options.TrustedPlatformAssemblyNames)
         {
-            if (TrustedPlatformAssemblyLookup.TryGetValue(assemblyName, out string? assemblyPath))
+            if (_trustedPlatformAssemblyLookup.TryGetValue(assemblyName, out string? assemblyPath))
                 references.Add(assemblyPath);
         }
 
@@ -54,7 +54,7 @@ internal sealed class GeneratorTestRunner<TGenerator> where TGenerator : IIncrem
         return new GeneratorTestRunResult(
             generatedSource,
             options.GeneratedFile,
-            references.ToImmutableArray(),
+            [.. references],
             testSource,
             runResult.Diagnostics
         );

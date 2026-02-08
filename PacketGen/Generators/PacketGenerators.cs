@@ -157,9 +157,6 @@ public partial class {{className}}
         // Dictionary<TKey, TValue>
         if (namedType.Name == "Dictionary")
         {
-            ITypeSymbol keyType = namedType.TypeArguments[0];
-            ITypeSymbol valueType = namedType.TypeArguments[1];
-
             string kvVar = $"kv{depth}";
 
             if (depth == 0)

@@ -70,9 +70,9 @@ internal sealed class GeneratorTestBuilder<TGenerator> where TGenerator : IIncre
 
         return new GeneratorTestOptions(
             _generatedFile!,
-            _sources.ToImmutableArray(),
-            _references.ToImmutableArray(),
-            _trustedPlatformAssemblies.ToImmutableArray()
+            [.. _sources],
+            [.. _references],
+            [.. _trustedPlatformAssemblies]
         );
     }
 }

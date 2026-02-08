@@ -27,11 +27,11 @@ internal class PacketTests
             .WithGeneratedFile("CPacketPlayerPosition.g.cs")
             .Build();
 
-        GeneratorTestRunResult? result = new GeneratorTestRunner<PacketGenerator>().Run(options);
+        GeneratorTestRunResult? result = GeneratorTestRunner<PacketGenerator>.Run(options);
 
         Assert.That(result, Is.Not.Null, "CPacketPlayerPosition.g.cs failed to generate");
 
-        IGeneratedFileStore fileStore = new GeneratedFileStore();
+        GeneratedFileStore fileStore = new();
         fileStore.Write(result.GeneratedFile, result.GeneratedSource);
 
         string source = result.GeneratedSource;
@@ -88,7 +88,7 @@ internal class PacketTests
             .WithGeneratedFile("CPacketEmpty.g.cs")
             .Build();
 
-        GeneratorTestRunResult? result = new GeneratorTestRunner<PacketGenerator>().Run(options);
+        GeneratorTestRunResult? result = GeneratorTestRunner<PacketGenerator>.Run(options);
 
         Assert.That(result, Is.Null, "A packet with no properties should not trigger the source generator.");
     }
@@ -111,13 +111,13 @@ internal class PacketTests
             .WithGeneratedFile($"{className}.g.cs")
             .Build();
 
-        GeneratorTestRunResult? result = new GeneratorTestRunner<PacketGenerator>().Run(options);
+        GeneratorTestRunResult? result = GeneratorTestRunner<PacketGenerator>.Run(options);
 
         Assert.That(result, Is.Not.Null, $"{className}.g.cs failed to generate");
 
-        IGeneratedFileStore fileStore = new GeneratedFileStore();
+        GeneratedFileStore fileStore = new();
         fileStore.Write(result.GeneratedFile, result.GeneratedSource);
 
-        new GeneratedAssemblyCompiler().Compile(result, fileStore);
+        GeneratedAssemblyCompiler.Compile(result, fileStore);
     }
 }

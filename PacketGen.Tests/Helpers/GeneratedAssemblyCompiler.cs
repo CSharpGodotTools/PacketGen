@@ -12,7 +12,7 @@ namespace PacketGen.Tests;
 
 internal sealed class GeneratedAssemblyCompiler
 {
-    public Assembly Compile(GeneratorTestRunResult result, IGeneratedFileStore fileStore, string? extraSource = null)
+    public static Assembly Compile(GeneratorTestRunResult result, IGeneratedFileStore fileStore, string? extraSource = null)
     {
         SyntaxTree genTree = CSharpSyntaxTree.ParseText(result.GeneratedSource);
         SyntaxTree sourceTree = CSharpSyntaxTree.ParseText(result.TestSource);
@@ -35,9 +35,7 @@ internal sealed class GeneratedAssemblyCompiler
         using MemoryStream ms = new();
         EmitResult emit = genCompilation.Emit(ms);
 
-        ImmutableArray<Diagnostic> diagnostics = emit.Diagnostics
-            .Where(d => d.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning)
-            .ToImmutableArray();
+        ImmutableArray<Diagnostic> diagnostics = [.. emit.Diagnostics.Where(d => d.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning)];
 
         if (!emit.Success)
         {

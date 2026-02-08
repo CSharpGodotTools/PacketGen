@@ -28,17 +28,17 @@ internal class PacketRegistryTests
             .WithGeneratedFile("PacketRegistry.g.cs")
             .Build();
 
-        GeneratorTestRunResult? result = new GeneratorTestRunner<PacketGenerator>().Run(options);
+        GeneratorTestRunResult? result = GeneratorTestRunner<PacketGenerator>.Run(options);
 
         Assert.That(result, Is.Not.Null, "PacketRegistry.g.cs failed to generate");
 
-        IGeneratedFileStore fileStore = new GeneratedFileStore();
+        GeneratedFileStore fileStore = new();
         fileStore.Write(result.GeneratedFile, result.GeneratedSource);
 
         string source = result.GeneratedSource;
 
         Assert.That(source, Does.Contain("ushort"));
 
-        new GeneratedAssemblyCompiler().Compile(result, fileStore);
+        GeneratedAssemblyCompiler.Compile(result, fileStore);
     }
 }
