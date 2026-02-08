@@ -1,4 +1,5 @@
 ﻿using Microsoft.CodeAnalysis;
+using System;
 using PacketGen.Generators.PacketGeneration;
 using PacketGen.Utilities;
 
@@ -52,6 +53,7 @@ internal sealed class ArrayTypeHandler(TypeHandlerRegistry registry) : ITypeHand
         ITypeSymbol elementType = arrayType.ElementType;
 
         string elementTypeName = elementType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+        TypeNamespaceHelper.AddNamespaceIfNeeded(elementType, ctx.Shared.Namespaces);
 
         string countVar = depth == 0
             ? $"{char.ToLowerInvariant(rootName[0])}{rootName.Substring(1)}Count"
@@ -63,8 +65,10 @@ internal sealed class ArrayTypeHandler(TypeHandlerRegistry registry) : ITypeHand
         if (depth == 0)
             ctx.Shared.OutputLines.Add($"{indent}#region {ctx.TargetExpression}");
 
+        string allocation = BuildArrayAllocation(arrayType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat), countVar);
+
         ctx.Shared.OutputLines.Add($"{indent}int {countVar} = reader.ReadInt();");
-        ctx.Shared.OutputLines.Add($"{indent}{ctx.TargetExpression} = new {elementTypeName}[{countVar}];");
+        ctx.Shared.OutputLines.Add($"{indent}{ctx.TargetExpression} = new {allocation};");
         ctx.Shared.OutputLines.Add("");
 
         ctx.Shared.OutputLines.Add($"{indent}for (int {loopIndex} = 0; {loopIndex} < {countVar}; {loopIndex}++)");
@@ -78,7 +82,7 @@ internal sealed class ArrayTypeHandler(TypeHandlerRegistry registry) : ITypeHand
         }
         else
         {
-            ctx.Shared.OutputLines.Add($"{indent}    {elementTypeName} {elementVar} = new {elementTypeName}();");
+            ctx.Shared.OutputLines.Add($"{indent}    {elementTypeName} {elementVar};");
 
             GenerationContext nested = new(ctx.Shared.Compilation, ctx.Shared.Property, elementType, ctx.Shared.OutputLines, ctx.Shared.Namespaces);
             registry.TryEmitRead(new ReadContext(nested, elementVar), indent + "    ", depth + 1, rootName);
@@ -92,4 +96,17 @@ internal sealed class ArrayTypeHandler(TypeHandlerRegistry registry) : ITypeHand
         if (depth == 0)
             ctx.Shared.OutputLines.Add($"{indent}#endregion");
     }
+
+    private static string BuildArrayAllocation(string arrayTypeName, string countVar)
+    {
+        int index = arrayTypeName.IndexOf("[]", StringComparison.Ordinal);
+
+        if (index < 0)
+            return $"{arrayTypeName}[{countVar}]";
+
+        string prefix = arrayTypeName.Substring(0, index);
+        string suffix = arrayTypeName.Substring(index + 2);
+        return prefix + $"[{countVar}]" + suffix;
+    }
 }
+

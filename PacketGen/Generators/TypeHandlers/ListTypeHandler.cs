@@ -57,6 +57,7 @@ internal sealed class ListTypeHandler(TypeHandlerRegistry registry) : ITypeHandl
         ITypeSymbol elementType = namedType.TypeArguments[0];
 
         string elementTypeName = elementType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+        TypeNamespaceHelper.AddNamespaceIfNeeded(elementType, ctx.Shared.Namespaces);
 
         string countVar = depth == 0
             ? $"{char.ToLowerInvariant(rootName[0])}{rootName.Substring(1)}Count"
@@ -83,7 +84,7 @@ internal sealed class ListTypeHandler(TypeHandlerRegistry registry) : ITypeHandl
         }
         else
         {
-            ctx.Shared.OutputLines.Add($"{indent}    {elementTypeName} {elementVar} = new {elementTypeName}();");
+            ctx.Shared.OutputLines.Add($"{indent}    {elementTypeName} {elementVar};");
 
             GenerationContext nested = new(ctx.Shared.Compilation, ctx.Shared.Property, elementType, ctx.Shared.OutputLines, ctx.Shared.Namespaces);
             registry.TryEmitRead(new ReadContext(nested, elementVar), indent + "    ", depth + 1, rootName);

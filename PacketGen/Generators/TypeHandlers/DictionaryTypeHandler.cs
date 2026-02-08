@@ -54,6 +54,8 @@ internal sealed class DictionaryTypeHandler(TypeHandlerRegistry registry) : ITyp
 
         string keyTypeName = keyType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
         string valueTypeName = valueType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+        TypeNamespaceHelper.AddNamespaceIfNeeded(keyType, ctx.Shared.Namespaces);
+        TypeNamespaceHelper.AddNamespaceIfNeeded(valueType, ctx.Shared.Namespaces);
 
         string countVar = depth == 0
             ? $"{char.ToLowerInvariant(rootName[0])}{rootName.Substring(1)}Count"
