@@ -1,7 +1,4 @@
-﻿using System.Collections;
-using System.Reflection;
-
-namespace PacketGen.Tests;
+﻿namespace PacketGen.Tests;
 
 internal class PacketRegistryTests
 {
@@ -26,17 +23,21 @@ internal class PacketRegistryTests
         }
         """;
 
-        GeneratorTest<PacketGenerator> test = new(testCode, "PacketRegistry.g.cs");
+        GeneratorTestOptions options = new GeneratorTestBuilder<PacketGenerator>(testCode)
+            .WithGeneratedFile("PacketRegistry.g.cs")
+            .Build();
 
-        GeneratorTestResult? testBuilder = test.Start();
+        GeneratorTestRunResult? result = new GeneratorTestRunner<PacketGenerator>().Run(options);
 
-        Assert.That(testBuilder, Is.Not.Null, "PacketRegistry.g.cs failed to generate");
+        Assert.That(result, Is.Not.Null, "PacketRegistry.g.cs failed to generate");
 
-        testBuilder
-            .GetGeneratedSource(out string source);
+        IGeneratedFileStore fileStore = new GeneratedFileStore();
+        fileStore.Write(result.GeneratedFile, result.GeneratedSource);
+
+        string source = result.GeneratedSource;
 
         Assert.That(source, Does.Contain("ushort"));
 
-        testBuilder.CompileGeneratedAssembly(source);
+        new GeneratedAssemblyCompiler().Compile(result, fileStore);
     }
 }

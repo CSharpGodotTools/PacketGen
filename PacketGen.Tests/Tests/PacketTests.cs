@@ -1,8 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
-using System.Reflection;
-using System.Text;
-
-namespace PacketGen.Tests;
+﻿namespace PacketGen.Tests;
 
 internal class PacketTests
 {
@@ -26,13 +22,18 @@ internal class PacketTests
         }
         """;
 
-        GeneratorTest<PacketGenerator> test = new(testCode, "CPacketPlayerPosition.g.cs");
+        GeneratorTestOptions options = new GeneratorTestBuilder<PacketGenerator>(testCode)
+            .WithGeneratedFile("CPacketPlayerPosition.g.cs")
+            .Build();
 
-        GeneratorTestResult? testBuilder = test.Start();
+        GeneratorTestRunResult? result = new GeneratorTestRunner<PacketGenerator>().Run(options);
 
-        Assert.That(testBuilder, Is.Not.Null, "CPacketPlayerPosition.g.cs failed to generate");
-            
-        testBuilder.GetGeneratedSource(out string source);
+        Assert.That(result, Is.Not.Null, "CPacketPlayerPosition.g.cs failed to generate");
+
+        IGeneratedFileStore fileStore = new GeneratedFileStore();
+        fileStore.Write(result.GeneratedFile, result.GeneratedSource);
+
+        string source = result.GeneratedSource;
 
         // Check if write read methods exist
         using (Assert.EnterMultipleScope())
@@ -82,11 +83,13 @@ internal class PacketTests
         }
         """;
 
-        GeneratorTest<PacketGenerator> test = new(testCode, "CPacketEmpty.g.cs");
+        GeneratorTestOptions options = new GeneratorTestBuilder<PacketGenerator>(testCode)
+            .WithGeneratedFile("CPacketEmpty.g.cs")
+            .Build();
 
-        GeneratorTestResult? testResult = test.Start();
+        GeneratorTestRunResult? result = new GeneratorTestRunner<PacketGenerator>().Run(options);
 
-        Assert.That(testResult, Is.Null, "A packet with no properties should not trigger the source generator.");
+        Assert.That(result, Is.Null, "A packet with no properties should not trigger the source generator.");
     }
 
     [Test]
@@ -103,14 +106,17 @@ internal class PacketTests
         }
         """;
 
-        GeneratorTest<PacketGenerator> test = new(testCode, $"{className}.g.cs");
+        GeneratorTestOptions options = new GeneratorTestBuilder<PacketGenerator>(testCode)
+            .WithGeneratedFile($"{className}.g.cs")
+            .Build();
 
-        GeneratorTestResult? testBuilder = test.Start();
+        GeneratorTestRunResult? result = new GeneratorTestRunner<PacketGenerator>().Run(options);
 
-        Assert.That(testBuilder, Is.Not.Null, $"{className}.g.cs failed to generate");
+        Assert.That(result, Is.Not.Null, $"{className}.g.cs failed to generate");
 
-        testBuilder.GetGeneratedSource(out string source);
+        IGeneratedFileStore fileStore = new GeneratedFileStore();
+        fileStore.Write(result.GeneratedFile, result.GeneratedSource);
 
-        testBuilder.CompileGeneratedAssembly(source);
+        new GeneratedAssemblyCompiler().Compile(result, fileStore);
     }
 }
