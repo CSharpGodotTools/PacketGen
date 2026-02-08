@@ -68,16 +68,16 @@ public partial class {{model.ClassName}}
             return false;
 
         return 
-{{string.Join("\n", equalsLines.Select((line, i) => indent12 + line + (i == equalsLines.Count - 1 ? ";" : " &&")))}}
+{{string.Join("\n", equalsLines.Select((line, i) => indent12 + line + (i == equalsLines.Count - 1 ? ";" : " &&")))} }
     }
 
     public override int GetHashCode()
     {
-        HashCode hashCode = new();
+        int hash = 17;
 
 {{string.Join("\n", hashLines.Select(line => indent8 + line))}}
 
-        return hashCode.ToHashCode();
+        return hash;
     }
 }
 
@@ -106,5 +106,3 @@ public partial class {{model.ClassName}}
         return registry;
     }
 }
-
-

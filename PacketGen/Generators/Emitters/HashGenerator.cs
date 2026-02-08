@@ -8,7 +8,10 @@ internal sealed class HashGenerator : IHashGenerator
 {
     public void Generate(List<string> hashLines, IPropertySymbol property, HashSet<string> namespaces)
     {
-        namespaces.Add("System");
-        hashLines.Add($"hashCode.Add({property.Name});");
+        string propHash = property.Type.IsReferenceType || property.NullableAnnotation == NullableAnnotation.Annotated
+            ? $"({property.Name} != null ? {property.Name}.GetHashCode() : 0)"
+            : $"{property.Name}.GetHashCode()";
+
+        hashLines.Add($"hash = (hash * 397) ^ {propHash};");
     }
 }
